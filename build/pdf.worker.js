@@ -150,7 +150,7 @@ var _pdf_manager = __w_pdfjs_require__(151);
 
 var _is_node = _interopRequireDefault(__w_pdfjs_require__(9));
 
-var _message_handler = __w_pdfjs_require__(189);
+var _message_handler = __w_pdfjs_require__(190);
 
 var _primitives = __w_pdfjs_require__(155);
 
@@ -418,7 +418,7 @@ var WorkerMessageHandler = {
       _loadDocument = _asyncToGenerator(
       /*#__PURE__*/
       _regenerator.default.mark(function _callee(recoveryMode) {
-        var _ref6, _ref7, numPages, fingerprint;
+        var _ref6, _ref7, numPages, fingerprint, structureTree;
 
         return _regenerator.default.wrap(function _callee$(_context) {
           while (1) {
@@ -446,19 +446,21 @@ var WorkerMessageHandler = {
 
               case 9:
                 _context.next = 11;
-                return Promise.all([pdfManager.ensureDoc('numPages'), pdfManager.ensureDoc('fingerprint')]);
+                return Promise.all([pdfManager.ensureDoc('numPages'), pdfManager.ensureDoc('fingerprint'), pdfManager.ensureDoc('structureTree')]);
 
               case 11:
                 _ref6 = _context.sent;
-                _ref7 = _slicedToArray(_ref6, 2);
+                _ref7 = _slicedToArray(_ref6, 3);
                 numPages = _ref7[0];
                 fingerprint = _ref7[1];
+                structureTree = _ref7[2];
                 return _context.abrupt("return", {
                   numPages: numPages,
-                  fingerprint: fingerprint
+                  fingerprint: fingerprint,
+                  structureTree: structureTree
                 });
 
-              case 16:
+              case 17:
               case "end":
                 return _context.stop();
             }
@@ -12275,6 +12277,18 @@ var _evaluator = __w_pdfjs_require__(171);
 
 var _function = __w_pdfjs_require__(185);
 
+function _typeof(obj) { if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
+
+function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } return _assertThisInitialized(self); }
+
+function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
+
+function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf(subClass, superClass); }
+
+function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
+
 function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest(); }
 
 function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance"); }
@@ -12432,6 +12446,7 @@ function () {
         pdfFunctionFactory: this.pdfFunctionFactory
       });
       var dataPromises = Promise.all([contentStreamPromise, resourcesPromise]);
+      var boundingBoxes;
       var pageListPromise = dataPromises.then(function (_ref3) {
         var _ref4 = _slicedToArray(_ref3, 1),
             contentStream = _ref4[0];
@@ -12446,8 +12461,10 @@ function () {
           stream: contentStream,
           task: task,
           resources: _this2.resources,
-          operatorList: opList
-        }).then(function () {
+          operatorList: opList,
+          intent: intent
+        }).then(function (boundingBoxesByMCID) {
+          boundingBoxes = boundingBoxesByMCID;
           return opList;
         });
       });
@@ -12457,6 +12474,10 @@ function () {
             annotations = _ref6[1];
 
         if (annotations.length === 0) {
+          if (intent === 'oplist') {
+            pageOpList.addOp(_util.OPS.save, boundingBoxes);
+          }
+
           pageOpList.flush(true);
           return pageOpList;
         }
@@ -12516,6 +12537,11 @@ function () {
           }
 
           pageOpList.addOp(_util.OPS.endAnnotations, []);
+
+          if (intent === 'oplist') {
+            pageOpList.addOp(_util.OPS.save, boundingBoxes);
+          }
+
           pageOpList.flush(true);
           return pageOpList;
         });
@@ -13077,7 +13103,28 @@ function () {
   return PDFDocument;
 }();
 
-exports.PDFDocument = PDFDocument;
+var ExtendedPDFDocument =
+/*#__PURE__*/
+function (_PDFDocument) {
+  _inherits(ExtendedPDFDocument, _PDFDocument);
+
+  function ExtendedPDFDocument(pdfManager, arg) {
+    _classCallCheck(this, ExtendedPDFDocument);
+
+    return _possibleConstructorReturn(this, _getPrototypeOf(ExtendedPDFDocument).call(this, pdfManager, arg));
+  }
+
+  _createClass(ExtendedPDFDocument, [{
+    key: "structureTree",
+    get: function get() {
+      return (0, _util.shadow)(this, 'structureTree', this.catalog.structureTree);
+    }
+  }]);
+
+  return ExtendedPDFDocument;
+}(PDFDocument);
+
+exports.PDFDocument = ExtendedPDFDocument;
 
 /***/ }),
 /* 154 */
@@ -14103,8 +14150,6 @@ function () {
 
   return Catalog;
 }();
-
-exports.Catalog = Catalog;
 
 var XRef = function XRefClosure() {
   function XRef(stream, pdfManager) {
@@ -15310,6 +15355,175 @@ var ObjectLoader = function () {
 }();
 
 exports.ObjectLoader = ObjectLoader;
+
+var ExtendedCatalog =
+/*#__PURE__*/
+function (_Catalog) {
+  _inherits(ExtendedCatalog, _Catalog);
+
+  function ExtendedCatalog(pdfManager, xref) {
+    var _this3;
+
+    _classCallCheck(this, ExtendedCatalog);
+
+    _this3 = _possibleConstructorReturn(this, _getPrototypeOf(ExtendedCatalog).call(this, pdfManager, xref));
+    _this3.pages = _this3.getPages(_this3.toplevelPagesDict.get('Kids'));
+    return _this3;
+  }
+
+  _createClass(ExtendedCatalog, [{
+    key: "_convertStructToObject",
+    value: function _convertStructToObject(struct) {
+      var _this4 = this;
+
+      if (Array.isArray(struct)) {
+        return struct.map(function (el) {
+          return _this4._convertStructToObject(el);
+        });
+      } else if ((0, _primitives.isDict)(struct)) {
+        var result = {};
+        struct.getKeys().forEach(function (key) {
+          result[key] = _this4._convertStructToObject(struct.get(key));
+        });
+        return result;
+      } else if ((0, _primitives.isName)(struct)) {
+        return struct.name;
+      } else {
+        return struct;
+      }
+    }
+  }, {
+    key: "getTreeElement",
+    value: function getTreeElement(el, page, ref) {
+      var _this5 = this;
+
+      if ((0, _primitives.isDict)(el) && el.has('Pg')) {
+        var pageRef = el.getRaw('Pg');
+        var newPage = this.pages.findIndex(function (el) {
+          return el.num === pageRef.num && el.gen === pageRef.gen;
+        });
+        newPage = newPage !== -1 ? newPage : null;
+
+        if (newPage !== page) {
+          page = newPage;
+        }
+      }
+
+      if ((0, _primitives.isDict)(el) && el.has('K')) {
+        return {
+          name: (0, _util.stringToUTF8String)(el.get('S').name),
+          children: this.getTreeElement(el.get('K'), page, el.getRaw('K')),
+          ref: ref
+        };
+      }
+
+      if ((0, _primitives.isDict)(el) && el.has('Obj')) {
+        var obj = el.get('Obj');
+        var type = null;
+
+        if (obj.has('Type')) {
+          type = obj.get('Type').name;
+        }
+
+        if (obj.has('Subtype')) {
+          type = obj.get('Subtype').name;
+        }
+
+        switch (type) {
+          case 'Link':
+          case 'Annot':
+            var rect = obj.get('Rect');
+            return {
+              rect: [rect[0], rect[1], rect[2], rect[3]],
+              pageIndex: page
+            };
+
+          default:
+            break;
+        }
+      }
+
+      if (Array.isArray(el)) {
+        return el.map(function (subel) {
+          if (Number.isInteger(subel)) {
+            return {
+              mcid: subel,
+              pageIndex: page
+            };
+          } else if (!(subel.hasOwnProperty('num') && subel.hasOwnProperty('gen')) && subel.get('Type') !== 'OBJR') {
+            return _this5.getTreeElement(subel, page);
+          } else if (subel.hasOwnProperty('num') && subel.hasOwnProperty('gen')) {
+            return _this5.getTreeElement(_this5.xref.fetch(subel), page, subel);
+          }
+        });
+      }
+
+      if (Number.isInteger(el)) {
+        return {
+          mcid: el,
+          pageIndex: page
+        };
+      }
+
+      if ((0, _primitives.isDict)(el) && el.has('Type') && el.get('Type').name === 'MCR') {
+        return {
+          mcid: el.get('MCID'),
+          pageIndex: page
+        };
+      }
+    }
+  }, {
+    key: "getPages",
+    value: function getPages(pages) {
+      var _this6 = this;
+
+      var pagesArray = [];
+      pages.map(function (kid) {
+        if ((0, _primitives.isRef)(kid)) {
+          var kidObj = _this6.xref.fetch(kid);
+
+          var kidObjType = kidObj.get('Type').name;
+
+          switch (kidObjType) {
+            case 'Page':
+              pagesArray.push(kid);
+              break;
+
+            case 'Pages':
+              var array = _this6.getPages(kidObj.get('Kids'));
+
+              pagesArray = pagesArray.concat(array);
+              break;
+
+            default:
+              break;
+          }
+        }
+      });
+      return pagesArray;
+    }
+  }, {
+    key: "structTreeRoot",
+    get: function get() {
+      var structTreeRoot = this.catDict.get('StructTreeRoot');
+
+      if (!(0, _primitives.isDict)(structTreeRoot)) {
+        return null;
+      }
+
+      return (0, _util.shadow)(this, 'structTreeRoot', structTreeRoot);
+    }
+  }, {
+    key: "structureTree",
+    get: function get() {
+      return (0, _util.shadow)(this, 'structureTree', this.getTreeElement(this.structTreeRoot.get('K'), null, this.structTreeRoot.getRaw('K')));
+    }
+  }]);
+
+  return ExtendedCatalog;
+}(Catalog);
+
+exports.Catalog = ExtendedCatalog;
 
 /***/ }),
 /* 155 */
@@ -29982,7 +30196,7 @@ exports.OperatorList = OperatorList;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.PartialEvaluator = void 0;
+exports.TextState = exports.StateManager = exports.PartialEvaluator = void 0;
 
 var _regenerator = _interopRequireDefault(__w_pdfjs_require__(2));
 
@@ -30023,6 +30237,8 @@ var _murmurhash = __w_pdfjs_require__(187);
 var _operator_list = __w_pdfjs_require__(170);
 
 var _image = __w_pdfjs_require__(188);
+
+var _bounding_boxes = __w_pdfjs_require__(189);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -30626,7 +30842,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
       }).then(function (translated) {
         state.font = translated.font;
         translated.send(_this4.handler);
-        return translated.loadedName;
+        return translated;
       });
     },
     handleText: function handleText(chars, state) {
@@ -30672,9 +30888,9 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
 
           case 'Font':
             promise = promise.then(function () {
-              return _this5.handleSetFont(resources, null, value[0], operatorList, task, stateManager.state).then(function (loadedName) {
-                operatorList.addDependency(loadedName);
-                gStateObj.push([key, [loadedName, value[1]]]);
+              return _this5.handleSetFont(resources, null, value[0], operatorList, task, stateManager.state).then(function (translated) {
+                operatorList.addDependency(translated.loadedName);
+                gStateObj.push([key, [translated.loadedName, value[1]]]);
               });
             });
             break;
@@ -30911,7 +31127,8 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
           resources = _ref6.resources,
           operatorList = _ref6.operatorList,
           _ref6$initialState = _ref6.initialState,
-          initialState = _ref6$initialState === void 0 ? null : _ref6$initialState;
+          initialState = _ref6$initialState === void 0 ? null : _ref6$initialState,
+          intent = _ref6.intent;
       resources = resources || _primitives.Dict.empty;
       initialState = initialState || new EvalState();
 
@@ -30919,6 +31136,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
         throw new Error('getOperatorList: missing "operatorList" parameter');
       }
 
+      var boundingBoxCalculator = new _bounding_boxes.BoundingBoxesCalculator(intent !== 'oplist');
       var self = this;
       var xref = this.xref;
       var imageCache = Object.create(null);
@@ -31007,6 +31225,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
                   }, rejectXObject);
                   return;
                 } else if (type.name === 'Image') {
+                  boundingBoxCalculator.parseOperator(_util.OPS.paintXObject, [type.name]);
                   self.buildPaintImageXObject({
                     resources: resources,
                     image: xobj,
@@ -31037,9 +31256,10 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
 
             case _util.OPS.setFont:
               var fontSize = args[1];
-              next(self.handleSetFont(resources, args, null, operatorList, task, stateManager.state).then(function (loadedName) {
-                operatorList.addDependency(loadedName);
-                operatorList.addOp(_util.OPS.setFont, [loadedName, fontSize]);
+              next(self.handleSetFont(resources, args, null, operatorList, task, stateManager.state).then(function (translated) {
+                boundingBoxCalculator.parseOperator(_util.OPS.setFont, [fontSize, translated]);
+                operatorList.addDependency(translated.loadedName);
+                operatorList.addOp(_util.OPS.setFont, [translated.loadedName, fontSize]);
               }));
               return;
 
@@ -31092,6 +31312,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
 
             case _util.OPS.nextLineShowText:
               operatorList.addOp(_util.OPS.nextLine);
+              boundingBoxCalculator.parseOperator(_util.OPS.nextLine);
               args[0] = self.handleText(args[0], stateManager.state);
               fn = _util.OPS.showText;
               break;
@@ -31100,6 +31321,9 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
               operatorList.addOp(_util.OPS.nextLine);
               operatorList.addOp(_util.OPS.setWordSpacing, [args.shift()]);
               operatorList.addOp(_util.OPS.setCharSpacing, [args.shift()]);
+              boundingBoxCalculator.parseOperator(_util.OPS.nextLine);
+              boundingBoxCalculator.parseOperator(_util.OPS.setWordSpacing, [args.shift()]);
+              boundingBoxCalculator.parseOperator(_util.OPS.setCharSpacing, [args.shift()]);
               args[0] = self.handleText(args[0], stateManager.state);
               fn = _util.OPS.showText;
               break;
@@ -31224,18 +31448,19 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
             case _util.OPS.curveTo2:
             case _util.OPS.curveTo3:
             case _util.OPS.closePath:
-              self.buildPath(operatorList, fn, args);
-              continue;
-
             case _util.OPS.rectangle:
               self.buildPath(operatorList, fn, args);
+              boundingBoxCalculator.parseOperator(fn, args);
+              continue;
+
+            case _util.OPS.beginMarkedContent:
+            case _util.OPS.beginMarkedContentProps:
+            case _util.OPS.endMarkedContent:
+              boundingBoxCalculator.parseOperator(fn, args);
               continue;
 
             case _util.OPS.markPoint:
             case _util.OPS.markPointProps:
-            case _util.OPS.beginMarkedContent:
-            case _util.OPS.beginMarkedContentProps:
-            case _util.OPS.endMarkedContent:
             case _util.OPS.beginCompat:
             case _util.OPS.endCompat:
               continue;
@@ -31256,6 +31481,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
 
           }
 
+          boundingBoxCalculator.parseOperator(fn, args);
           operatorList.addOp(fn, args);
         }
 
@@ -31265,7 +31491,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
         }
 
         closePendingRestoreOPS();
-        resolve();
+        resolve(boundingBoxCalculator.boundingBoxes);
       }).catch(function (reason) {
         if (_this7.options.ignoreErrors) {
           _this7.handler.send('UnsupportedFeature', {
@@ -32725,6 +32951,8 @@ var StateManager = function StateManagerClosure() {
   return StateManager;
 }();
 
+exports.StateManager = StateManager;
+
 var TextState = function TextStateClosure() {
   function TextState() {
     this.ctm = new Float32Array(_util.IDENTITY_MATRIX);
@@ -32826,6 +33054,8 @@ var TextState = function TextStateClosure() {
   };
   return TextState;
 }();
+
+exports.TextState = TextState;
 
 var EvalState = function EvalStateClosure() {
   function EvalState() {
@@ -54860,6 +55090,710 @@ exports.PDFImage = PDFImage;
 
 /***/ }),
 /* 189 */
+/***/ (function(module, exports, __w_pdfjs_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.BoundingBoxesCalculator = void 0;
+
+var _util = __w_pdfjs_require__(6);
+
+var _evaluator = __w_pdfjs_require__(171);
+
+var _primitives = __w_pdfjs_require__(155);
+
+function _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread(); }
+
+function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance"); }
+
+function _iterableToArray(iter) { if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter); }
+
+function _arrayWithoutHoles(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } }
+
+function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest(); }
+
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance"); }
+
+function _iterableToArrayLimit(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"] != null) _i["return"](); } finally { if (_d) throw _e; } } return _arr; }
+
+function _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }
+
+var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
+  function BoundingBoxesCalculator(ignoreCalculations) {
+    this.textState = new _evaluator.TextState();
+    this.graphicsStateManager = new _evaluator.StateManager(new GraphicsState());
+    this.clipping = false;
+    this.boundingBoxesStack = new BoundingBoxStack();
+    this.boundingBoxes = {};
+    this.ignoreCalculations = ignoreCalculations;
+  }
+
+  BoundingBoxesCalculator.prototype = {
+    getTopPoints: function BoundingBoxesCalculator_getTopPoints(x0, y0, x1, y1, h) {
+      var l = Math.sqrt(Math.pow(x1 - x0, 2) + Math.pow(y1 - y0, 2));
+
+      if (l === 0) {
+        return [x1 + h, y1 + h, x0 + h, y0 + h];
+      }
+
+      var e = [(x1 - x0) / l, (y1 - y0) / l];
+      var rotated_e = [-e[1], e[0]];
+      var result_vector = [rotated_e[0] * h, rotated_e[1] * h];
+      return [x1 + result_vector[0], y1 + result_vector[1], x0 + result_vector[0], y0 + result_vector[1]];
+    },
+    getTextBoundingBox: function BoundingBoxesCalculator_getTextBoundingBox(glyphs) {
+      var tx = 0;
+      var ty = 0;
+      var ctm = this.graphicsStateManager.state.ctm;
+      var descent = (this.textState.font.descent || 0) * this.textState.fontSize;
+      var ascent = (this.textState.font.ascent || 1) * this.textState.fontSize;
+      var rise = this.textState.textRise * this.textState.fontSize;
+
+      var shift = _util.Util.applyTransform([0, descent + rise], this.textState.textMatrix);
+
+      shift[0] -= this.textState.textMatrix[4];
+      shift[1] -= this.textState.textMatrix[5];
+
+      var height = _util.Util.applyTransform([0, ascent + rise], this.textState.textMatrix);
+
+      height[0] -= this.textState.textMatrix[4] + shift[0];
+      height[1] -= this.textState.textMatrix[5] + shift[1];
+      height = Math.sqrt(height[0] * height[0] + height[1] * height[1]);
+      var tx0 = this.textState.textMatrix[4] + shift[0],
+          ty0 = this.textState.textMatrix[5] + shift[1];
+
+      for (var i = 0; i < glyphs.length; i++) {
+        var glyph = glyphs[i];
+
+        if ((0, _util.isNum)(glyph)) {
+          if (this.textState.font.vertical) {
+            ty = -glyph / 1000 * this.textState.fontSize * this.textState.textHScale;
+          } else {
+            tx = -glyph / 1000 * this.textState.fontSize * this.textState.textHScale;
+          }
+        } else {
+          var glyphWidth = null;
+
+          if (this.textState.font.vertical && glyph.vmetric) {
+            glyphWidth = glyph.vmetric[0];
+          } else {
+            glyphWidth = glyph.width;
+          }
+
+          if (!this.textState.font.vertical) {
+            var w0 = glyphWidth * (this.textState.fontMatrix ? this.textState.fontMatrix[0] : 1 / 1000);
+            tx = (w0 * this.textState.fontSize + this.textState.charSpacing + (glyph.isSpace ? this.textState.wordSpacing : 0)) * this.textState.textHScale;
+          } else {
+            var w1 = glyphWidth * (this.textState.fontMatrix ? this.textState.fontMatrix[0] : 1 / 1000);
+            ty = w1 * this.textState.fontSize + this.textState.charSpacing + (glyph.isSpace ? this.textState.wordSpacing : 0);
+          }
+        }
+
+        this.textState.translateTextMatrix(tx, ty);
+      }
+
+      var tx1 = this.textState.textMatrix[4] + shift[0],
+          ty1 = this.textState.textMatrix[5] + shift[1];
+
+      var _this$getTopPoints = this.getTopPoints(tx0, ty0, this.textState.textMatrix[4] + shift[0], this.textState.textMatrix[5] + shift[1], height),
+          _this$getTopPoints2 = _slicedToArray(_this$getTopPoints, 4),
+          tx2 = _this$getTopPoints2[0],
+          ty2 = _this$getTopPoints2[1],
+          tx3 = _this$getTopPoints2[2],
+          ty3 = _this$getTopPoints2[3];
+
+      var _Util$applyTransform = _util.Util.applyTransform([tx0, ty0], ctm),
+          _Util$applyTransform2 = _slicedToArray(_Util$applyTransform, 2),
+          x0 = _Util$applyTransform2[0],
+          y0 = _Util$applyTransform2[1];
+
+      var _Util$applyTransform3 = _util.Util.applyTransform([tx1, ty1], ctm),
+          _Util$applyTransform4 = _slicedToArray(_Util$applyTransform3, 2),
+          x1 = _Util$applyTransform4[0],
+          y1 = _Util$applyTransform4[1];
+
+      var _Util$applyTransform5 = _util.Util.applyTransform([tx2, ty2], ctm),
+          _Util$applyTransform6 = _slicedToArray(_Util$applyTransform5, 2),
+          x2 = _Util$applyTransform6[0],
+          y2 = _Util$applyTransform6[1];
+
+      var _Util$applyTransform7 = _util.Util.applyTransform([tx3, ty3], ctm),
+          _Util$applyTransform8 = _slicedToArray(_Util$applyTransform7, 2),
+          x3 = _Util$applyTransform8[0],
+          y3 = _Util$applyTransform8[1];
+
+      var minX = Math.min(x0, x1, x2, x3);
+      var maxX = Math.max(x0, x1, x2, x3);
+      var minY = Math.min(y0, y1, y2, y3);
+      var maxY = Math.max(y0, y1, y2, y3);
+      this.boundingBoxesStack.save(minX, minY, maxX - minX, maxY - minY);
+    },
+    getClippingGraphicsBoundingBox: function BoundingBoxesCalculator_getClippingGraphicsBoundingBox() {
+      var state = this.graphicsStateManager.state;
+
+      if (state.clip === null) {
+        return {
+          x: state.x,
+          y: state.y,
+          w: state.w,
+          h: state.h
+        };
+      }
+
+      if (state.x < state.clip.x && state.x + state.w < state.clip.x || state.x > state.clip.x + state.clip.w && state.x + state.w > state.clip.x + state.clip.w || state.y < state.clip.y && state.y + state.h < state.clip.y || state.y > state.clip.y + state.clip.h && state.y + state.h > state.clip.y + state.clip.h) {
+        return null;
+      }
+
+      return {
+        x: Math.max(state.x, state.clip.x),
+        y: Math.max(state.y, state.clip.y),
+        w: Math.min(state.x + state.w, state.clip.x + state.clip.w) - Math.max(state.x, state.clip.x),
+        h: Math.min(state.y + state.h, state.clip.y + state.clip.h) - Math.max(state.y, state.clip.y)
+      };
+    },
+    saveGraphicsBoundingBox: function saveGraphicsBoundingBox() {
+      var clippingBBox = this.getClippingGraphicsBoundingBox();
+
+      if (clippingBBox === null) {
+        return;
+      }
+
+      var x = clippingBBox.x;
+      var y = clippingBBox.y;
+      var w = clippingBBox.w;
+      var h = clippingBBox.h;
+      this.boundingBoxesStack.save(x, y, w, h);
+    },
+    getRectBoundingBox: function getRectBoundingBox(x, y, w, h) {
+      var state = this.graphicsStateManager.state;
+
+      var _Util$applyTransform9 = _util.Util.applyTransform([x, y], state.ctm),
+          _Util$applyTransform10 = _slicedToArray(_Util$applyTransform9, 2),
+          x1 = _Util$applyTransform10[0],
+          y1 = _Util$applyTransform10[1];
+
+      var _Util$applyTransform11 = _util.Util.applyTransform([x + w, y], state.ctm),
+          _Util$applyTransform12 = _slicedToArray(_Util$applyTransform11, 2),
+          x2 = _Util$applyTransform12[0],
+          y2 = _Util$applyTransform12[1];
+
+      var _Util$applyTransform13 = _util.Util.applyTransform([x, y + h], state.ctm),
+          _Util$applyTransform14 = _slicedToArray(_Util$applyTransform13, 2),
+          x3 = _Util$applyTransform14[0],
+          y3 = _Util$applyTransform14[1];
+
+      var _Util$applyTransform15 = _util.Util.applyTransform([x + w, y + h], state.ctm),
+          _Util$applyTransform16 = _slicedToArray(_Util$applyTransform15, 2),
+          x4 = _Util$applyTransform16[0],
+          y4 = _Util$applyTransform16[1];
+
+      x = Math.min(x1, x2, x3, x4);
+      y = Math.min(y1, y2, y3, y4);
+      w = Math.max(x1, x2, x3, x4) - x;
+      h = Math.max(y1, y2, y3, y4) - y;
+
+      if (state.w === null) {
+        state.w = Math.abs(w);
+      } else {
+        state.w = Math.max(state.x + state.w, x, x + w) - Math.min(state.x, x, x + w);
+      }
+
+      if (state.h === null) {
+        state.h = Math.abs(h);
+      } else {
+        state.h = Math.max(state.y + state.h, y, y + h) - Math.min(state.y, y, y + h);
+      }
+
+      if (state.x === null) {
+        state.x = Math.min(x, x + w);
+      } else {
+        state.x = Math.min(state.x, x, x + w);
+      }
+
+      if (state.y === null) {
+        state.y = Math.min(y, y + h);
+      } else {
+        state.y = Math.min(state.y, y, y + h);
+      }
+    },
+    getLineBoundingBox: function getLineBoundingBox(x, y) {
+      var state = this.graphicsStateManager.state;
+
+      var _Util$applyTransform17 = _util.Util.applyTransform([x, y], state.ctm);
+
+      var _Util$applyTransform18 = _slicedToArray(_Util$applyTransform17, 2);
+
+      x = _Util$applyTransform18[0];
+      y = _Util$applyTransform18[1];
+
+      if (state.w === null) {
+        state.w = Math.abs(x - state.move_x);
+      } else {
+        state.w = Math.max(x, state.move_x, state.x + state.w) - Math.min(x, state.move_x, state.x);
+      }
+
+      if (state.h === null) {
+        state.h = Math.abs(y - state.move_y);
+      } else {
+        state.h = Math.max(y, state.move_y, state.y + state.h) - Math.min(y, state.move_y, state.y);
+      }
+
+      if (state.x === null) {
+        state.x = Math.min(x, state.move_x);
+      } else {
+        state.x = Math.min(x, state.move_x, state.x);
+      }
+
+      if (state.y === null) {
+        state.y = Math.min(y, state.move_y);
+      } else {
+        state.y = Math.min(y, state.move_y, state.y);
+      }
+
+      state.move_x = x;
+      state.move_y = y;
+    },
+    getCurve: function getCurve(a, b, c, d) {
+      return function curve(t) {
+        return Math.pow(1 - t, 3) * a + 3 * t * Math.pow(1 - t, 2) * b + 3 * t * t * (1 - t) * c + t * t * t * d;
+      };
+    },
+    getCurveRoots: function getCurveRoots(a, b, c, d) {
+      var sqrt;
+      var root_1;
+      var root_2;
+      sqrt = Math.pow(6 * a - 12 * b + 6 * c, 2) - 4 * (3 * b - 3 * a) * (-3 * a + 9 * b - 9 * c + 3 * d);
+      root_1 = null;
+      root_2 = null;
+
+      if (Math.abs(a + 3 * c - 3 * b - d) > Math.pow(0.1, -10)) {
+        if (sqrt >= 0) {
+          root_1 = (-6 * a + 12 * b - 6 * c + Math.sqrt(sqrt)) / (2 * (-3 * a + 9 * b - 9 * c + 3 * d));
+          root_2 = (-6 * a + 12 * b - 6 * c - Math.sqrt(sqrt)) / (2 * (-3 * a + 9 * b - 9 * c + 3 * d));
+        }
+      } else if (sqrt > Math.pow(0.1, -10)) {
+        root_1 = (a - b) / (2 * a - 4 * b + 2 * c);
+      }
+
+      if (root_1 !== null && (root_1 < 0 || root_1 > 1)) {
+        root_1 = null;
+      }
+
+      if (root_2 !== null && (root_2 < 0 || root_2 > 1)) {
+        root_2 = null;
+      }
+
+      return [root_1, root_2];
+    },
+    getCurveBoundingBox: function getCurveBoundingBox(op, x0, y0, x1, y1, x2, y2, x3, y3) {
+      var state = this.graphicsStateManager.state;
+
+      if (op !== _util.OPS.curveTo2) {
+        var _Util$applyTransform19 = _util.Util.applyTransform([x1, y1], state.ctm);
+
+        var _Util$applyTransform20 = _slicedToArray(_Util$applyTransform19, 2);
+
+        x1 = _Util$applyTransform20[0];
+        y1 = _Util$applyTransform20[1];
+      }
+
+      var _Util$applyTransform21 = _util.Util.applyTransform([x2, y2], state.ctm);
+
+      var _Util$applyTransform22 = _slicedToArray(_Util$applyTransform21, 2);
+
+      x2 = _Util$applyTransform22[0];
+      y2 = _Util$applyTransform22[1];
+
+      var _Util$applyTransform23 = _util.Util.applyTransform([x3, y3], state.ctm);
+
+      var _Util$applyTransform24 = _slicedToArray(_Util$applyTransform23, 2);
+
+      x3 = _Util$applyTransform24[0];
+      y3 = _Util$applyTransform24[1];
+      var curveX = this.getCurve(x0, x1, x2, x3);
+      var curveY = this.getCurve(y0, y1, y2, y3);
+
+      var _this$getCurveRoots = this.getCurveRoots(x0, x1, x2, x3),
+          _this$getCurveRoots2 = _slicedToArray(_this$getCurveRoots, 2),
+          root_1 = _this$getCurveRoots2[0],
+          root_2 = _this$getCurveRoots2[1];
+
+      var minX = Math.min(x0, x3, root_1 !== null ? curveX(root_1) : Number.MAX_VALUE, root_2 !== null ? curveX(root_2) : Number.MAX_VALUE);
+      var maxX = Math.max(x0, x3, root_1 !== null ? curveX(root_1) : Number.MIN_VALUE, root_2 !== null ? curveX(root_2) : Number.MIN_VALUE);
+
+      var _this$getCurveRoots3 = this.getCurveRoots(y0, y1, y2, y3);
+
+      var _this$getCurveRoots4 = _slicedToArray(_this$getCurveRoots3, 2);
+
+      root_1 = _this$getCurveRoots4[0];
+      root_2 = _this$getCurveRoots4[1];
+      var minY = Math.min(y0, y3, root_1 !== null ? curveY(root_1) : Number.MAX_VALUE, root_2 !== null ? curveY(root_2) : Number.MAX_VALUE);
+      var maxY = Math.max(y0, y3, root_1 !== null ? curveY(root_1) : Number.MIN_VALUE, root_2 !== null ? curveY(root_2) : Number.MIN_VALUE);
+      var x = minX;
+      var y = minY;
+      var h = maxY - minY;
+      var w = maxX - minX;
+
+      if (state.w === null) {
+        state.w = Math.abs(w);
+      } else {
+        state.w = Math.max(state.x + state.w, x, x + w) - Math.min(state.x, x, x + w);
+      }
+
+      if (state.h === null) {
+        state.h = Math.abs(h);
+      } else {
+        state.h = Math.max(state.y + state.h, y, y + h) - Math.min(state.y, y, y + h);
+      }
+
+      if (state.x === null) {
+        state.x = Math.min(x, x + w);
+      } else {
+        state.x = Math.min(state.x, x, x + w);
+      }
+
+      if (state.y === null) {
+        state.y = Math.min(y, y + h);
+      } else {
+        state.y = Math.min(state.y, y, y + h);
+      }
+
+      state.move_x = x;
+      state.move_y = y;
+    },
+    getClip: function getClip() {
+      if (this.clipping) {
+        var state = this.graphicsStateManager.state;
+
+        if (state.clip === null) {
+          state.clip = {
+            x: state.x,
+            y: state.y,
+            w: state.w,
+            h: state.h
+          };
+        } else {
+          state.clip = {
+            x: Math.max(state.x, state.clip.x),
+            y: Math.max(state.y, state.clip.y),
+            w: Math.min(state.x + state.w, state.clip.x + state.clip.w) - Math.max(state.x, state.clip.x),
+            h: Math.min(state.y + state.h, state.clip.y + state.clip.h) - Math.max(state.y, state.clip.y)
+          };
+        }
+
+        this.clipping = false;
+      }
+    },
+    getImageBoundingBox: function getImageBoundingBox() {
+      var state = this.graphicsStateManager.state;
+
+      var _Util$applyTransform25 = _util.Util.applyTransform([0, 0], state.ctm),
+          _Util$applyTransform26 = _slicedToArray(_Util$applyTransform25, 2),
+          x0 = _Util$applyTransform26[0],
+          y0 = _Util$applyTransform26[1];
+
+      var _Util$applyTransform27 = _util.Util.applyTransform([0, 1], state.ctm),
+          _Util$applyTransform28 = _slicedToArray(_Util$applyTransform27, 2),
+          x1 = _Util$applyTransform28[0],
+          y1 = _Util$applyTransform28[1];
+
+      var _Util$applyTransform29 = _util.Util.applyTransform([1, 1], state.ctm),
+          _Util$applyTransform30 = _slicedToArray(_Util$applyTransform29, 2),
+          x2 = _Util$applyTransform30[0],
+          y2 = _Util$applyTransform30[1];
+
+      var _Util$applyTransform31 = _util.Util.applyTransform([1, 0], state.ctm),
+          _Util$applyTransform32 = _slicedToArray(_Util$applyTransform31, 2),
+          x3 = _Util$applyTransform32[0],
+          y3 = _Util$applyTransform32[1];
+
+      state.x = Math.min(x0, x1, x2, x3);
+      state.y = Math.min(y0, y1, y2, y3);
+      state.w = Math.max(x0, x1, x2, x3) - state.x;
+      state.h = Math.max(y0, y1, y2, y3) - state.y;
+    },
+    parseOperator: function BoundingBoxesCalculator_parseOperator(fn, args) {
+      var _this$textState;
+
+      if (this.ignoreCalculations) {
+        return;
+      }
+
+      switch (fn | 0) {
+        case _util.OPS.restore:
+          this.graphicsStateManager.restore();
+          break;
+
+        case _util.OPS.save:
+          this.graphicsStateManager.save();
+          break;
+
+        case _util.OPS.fill:
+        case _util.OPS.eoFill:
+        case _util.OPS.eoFillStroke:
+        case _util.OPS.fillStroke:
+        case _util.OPS.stroke:
+        case _util.OPS.closeEOFillStroke:
+        case _util.OPS.closeFillStroke:
+        case _util.OPS.closeStroke:
+          this.getClip();
+          this.saveGraphicsBoundingBox();
+          break;
+
+        case _util.OPS.endPath:
+          this.getClip();
+          this.graphicsStateManager.state.clean();
+          break;
+
+        case _util.OPS.transform:
+          this.graphicsStateManager.state.ctm = _util.Util.transform(this.graphicsStateManager.state.ctm, args);
+          break;
+
+        case _util.OPS.clip:
+        case _util.OPS.eoClip:
+          this.clipping = true;
+          break;
+
+        case _util.OPS.setFont:
+          this.textState.fontSize = args[0];
+          this.textState.fontMatrix = args[1].font.fontMatrix;
+          this.textState.font = args[1].font;
+          break;
+
+        case _util.OPS.setTextMatrix:
+          this.textState.setTextMatrix(args[0], args[1], args[2], args[3], args[4], args[5]);
+          this.textState.setTextLineMatrix(args[0], args[1], args[2], args[3], args[4], args[5]);
+          break;
+
+        case _util.OPS.nextLine:
+          this.textState.carriageReturn();
+          break;
+
+        case _util.OPS.setCharSpacing:
+          this.textState.charSpacing = args[0];
+          break;
+
+        case _util.OPS.setWordSpacing:
+          this.textState.wordSpacing = args[0];
+          break;
+
+        case _util.OPS.setHScale:
+          this.textState.textHScale = args[0] / 100;
+          break;
+
+        case _util.OPS.setLeading:
+          this.textState.leading = args[0];
+          break;
+
+        case _util.OPS.setTextRise:
+          this.textState.textRise = args[0];
+          break;
+
+        case _util.OPS.setLeadingMoveText:
+          this.textState.leading = -args[1];
+
+          (_this$textState = this.textState).translateTextLineMatrix.apply(_this$textState, _toConsumableArray(args));
+
+          this.textState.textMatrix = this.textState.textLineMatrix.slice();
+          break;
+
+        case _util.OPS.moveText:
+          this.textState.translateTextLineMatrix(args[0], args[1]);
+          this.textState.textMatrix = this.textState.textLineMatrix.slice();
+          break;
+
+        case _util.OPS.beginText:
+          this.textState.textMatrix = _util.IDENTITY_MATRIX.slice();
+          this.textState.textLineMatrix = _util.IDENTITY_MATRIX.slice();
+          break;
+
+        case _util.OPS.moveTo:
+          var ctm = this.graphicsStateManager.state.ctm.slice();
+
+          var _Util$applyTransform33 = _util.Util.applyTransform(args, ctm);
+
+          var _Util$applyTransform34 = _slicedToArray(_Util$applyTransform33, 2);
+
+          this.graphicsStateManager.state.move_x = _Util$applyTransform34[0];
+          this.graphicsStateManager.state.move_y = _Util$applyTransform34[1];
+          break;
+
+        case _util.OPS.lineTo:
+          this.getLineBoundingBox(args[0], args[1]);
+          break;
+
+        case _util.OPS.curveTo:
+          this.getCurveBoundingBox(_util.OPS.curveTo, this.graphicsStateManager.state.move_x, this.graphicsStateManager.state.move_y, args[0], args[1], args[2], args[3], args[4], args[5]);
+          break;
+
+        case _util.OPS.curveTo2:
+          this.getCurveBoundingBox(_util.OPS.curveTo2, this.graphicsStateManager.state.move_x, this.graphicsStateManager.state.move_y, this.graphicsStateManager.state.move_x, this.graphicsStateManager.state.move_y, args[0], args[1], args[2], args[3]);
+          break;
+
+        case _util.OPS.curveTo3:
+          this.getCurveBoundingBox(_util.OPS.curveTo3, this.graphicsStateManager.state.move_x, this.graphicsStateManager.state.move_y, args[0], args[1], args[2], args[3], args[2], args[3]);
+          break;
+
+        case _util.OPS.rectangle:
+          this.getRectBoundingBox(args[0], args[1], args[2], args[3]);
+          break;
+
+        case _util.OPS.markPoint:
+        case _util.OPS.markPointProps:
+        case _util.OPS.beginMarkedContent:
+          this.boundingBoxesStack.begin();
+          break;
+
+        case _util.OPS.beginMarkedContentProps:
+          if ((0, _primitives.isDict)(args[1]) && args[1].has('MCID')) {
+            this.boundingBoxesStack.begin(args[1].get('MCID'));
+            this.graphicsStateManager.state.x = null;
+            this.graphicsStateManager.state.y = null;
+            this.graphicsStateManager.state.w = null;
+            this.graphicsStateManager.state.h = null;
+          } else {
+            this.boundingBoxesStack.begin();
+          }
+
+          break;
+
+        case _util.OPS.endMarkedContent:
+          var boundingBox = this.boundingBoxesStack.end();
+
+          if (boundingBox !== null) {
+            this.boundingBoxes[boundingBox.mcid] = {
+              x: boundingBox.x,
+              y: boundingBox.y,
+              width: boundingBox.w,
+              height: boundingBox.h
+            };
+          }
+
+          break;
+
+        case _util.OPS.paintXObject:
+          if (args[0] === 'Image') {
+            this.getImageBoundingBox();
+            this.saveGraphicsBoundingBox();
+          }
+
+          break;
+
+        case _util.OPS.showText:
+          this.getTextBoundingBox(args[0]);
+          break;
+
+        default:
+          break;
+      }
+    },
+    setFont: function BoundingBoxesCalculator_setFont(translated) {
+      this.textState.fontMatrix = translated.font.fontMatrix;
+      this.textState.font = translated.font;
+    }
+  };
+  return BoundingBoxesCalculator;
+}();
+
+exports.BoundingBoxesCalculator = BoundingBoxesCalculator;
+
+var GraphicsState = function GraphicsState() {
+  function GraphicsState() {
+    this.x = null;
+    this.y = null;
+    this.w = null;
+    this.h = null;
+    this.move_x = null;
+    this.move_y = null;
+    this.ctm = _util.IDENTITY_MATRIX.slice();
+    this.clip = null;
+  }
+
+  GraphicsState.prototype = {
+    clone: function GraphicsState_clone() {
+      var clone = Object.create(this);
+      clone.ctm = this.ctm.slice();
+      return clone;
+    },
+    clean: function GraphicsState_clear() {
+      this.x = null;
+      this.y = null;
+      this.w = null;
+      this.h = null;
+      this.move_x = 0;
+      this.move_y = 0;
+      this.ctm = _util.IDENTITY_MATRIX.slice();
+    }
+  };
+  return GraphicsState;
+}();
+
+var BoundingBoxStack = function BoundingBoxStack() {
+  function BoundingBoxStack() {
+    this.stack = [];
+  }
+
+  BoundingBoxStack.prototype = {
+    begin: function BoundingBoxStack_begin(mcid) {
+      this.stack.push({
+        x: null,
+        y: null,
+        w: null,
+        h: null,
+        mcid: Number.isInteger(mcid) ? mcid : null
+      });
+    },
+    save: function BoundingBoxStack_save(x, y, w, h) {
+      var current = this.stack[this.stack.length - 1];
+
+      if (!current) {
+        return;
+      }
+
+      if (current.w === null) {
+        current.w = w;
+      } else {
+        current.w = Math.max(current.x + current.w, x + w) - Math.min(current.x, x);
+      }
+
+      if (current.x === null) {
+        current.x = x;
+      } else {
+        current.x = Math.min(current.x, x);
+      }
+
+      if (current.h === null) {
+        current.h = h;
+      } else {
+        current.h = Math.max(current.y + current.h, y + h) - Math.min(current.y, y);
+      }
+
+      if (current.y === null) {
+        current.y = y;
+      } else {
+        current.y = Math.min(current.y, y);
+      }
+    },
+    end: function BoundingBoxStack_end() {
+      var last = this.stack.pop();
+
+      if (last.mcid !== null) {
+        return last;
+      } else {
+        this.save(last.x, last.y, last.w, last.h);
+        return null;
+      }
+    }
+  };
+  return BoundingBoxStack;
+}();
+
+/***/ }),
+/* 190 */
 /***/ (function(module, exports, __w_pdfjs_require__) {
 
 "use strict";
