@@ -336,7 +336,7 @@ var _text_layer = __w_pdfjs_require__(17);
 var _svg = __w_pdfjs_require__(18);
 
 const pdfjsVersion = '2.5.207';
-const pdfjsBuild = '0974d605';
+const pdfjsBuild = '0974d60';
 {
   const {
     isNodeJS
@@ -3800,7 +3800,7 @@ const InternalRenderTask = function InternalRenderTaskClosure() {
 
 const version = '2.5.207';
 exports.version = version;
-const build = '0974d605';
+const build = '0974d60';
 exports.build = build;
 
 /***/ }),

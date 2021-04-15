@@ -136,7 +136,7 @@ Object.defineProperty(exports, "WorkerMessageHandler", {
 var _worker = __w_pdfjs_require__(1);
 
 const pdfjsVersion = '2.5.207';
-const pdfjsBuild = '0974d605';
+const pdfjsBuild = '0974d60';
 
 /***/ }),
 /* 1 */
@@ -158,9 +158,9 @@ var _pdf_manager = __w_pdfjs_require__(6);
 
 var _is_node = __w_pdfjs_require__(4);
 
-var _message_handler = __w_pdfjs_require__(45);
+var _message_handler = __w_pdfjs_require__(46);
 
-var _worker_stream = __w_pdfjs_require__(46);
+var _worker_stream = __w_pdfjs_require__(47);
 
 var _core_utils = __w_pdfjs_require__(8);
 
@@ -282,10 +282,11 @@ var WorkerMessageHandler = {
         await pdfManager.ensureDoc("checkFirstPage");
       }
 
-      const [numPages, fingerprint] = await Promise.all([pdfManager.ensureDoc("numPages"), pdfManager.ensureDoc("fingerprint")]);
+      const [numPages, fingerprint, structureTree] = await Promise.all([pdfManager.ensureDoc("numPages"), pdfManager.ensureDoc("fingerprint"), pdfManager.ensureDoc('structureTree')]);
       return {
         numPages,
-        fingerprint
+        fingerprint,
+        structureTree
       };
     }
 
@@ -3037,6 +3038,7 @@ class Page {
       pdfFunctionFactory: this.pdfFunctionFactory
     });
     const dataPromises = Promise.all([contentStreamPromise, resourcesPromise]);
+    let boundingBoxes;
     const pageListPromise = dataPromises.then(([contentStream]) => {
       const opList = new _operator_list.OperatorList(intent, sink, this.pageIndex);
       handler.send("StartRenderPage", {
@@ -3048,13 +3050,19 @@ class Page {
         stream: contentStream,
         task,
         resources: this.resources,
-        operatorList: opList
-      }).then(function () {
+        operatorList: opList,
+        intent
+      }).then(function (boundingBoxesByMCID) {
+        boundingBoxes = boundingBoxesByMCID;
         return opList;
       });
     });
     return Promise.all([pageListPromise, this._parsedAnnotations]).then(function ([pageOpList, annotations]) {
       if (annotations.length === 0) {
+        if (intent === 'oplist') {
+          pageOpList.addOp(_util.OPS.save, boundingBoxes);
+        }
+
         pageOpList.flush(true);
         return {
           length: pageOpList.totalLength
@@ -3080,6 +3088,11 @@ class Page {
         }
 
         pageOpList.addOp(_util.OPS.endAnnotations, []);
+
+        if (intent === 'oplist') {
+          pageOpList.addOp(_util.OPS.save, boundingBoxes);
+        }
+
         pageOpList.flush(true);
         return {
           length: pageOpList.totalLength
@@ -3556,7 +3569,18 @@ class PDFDocument {
 
 }
 
-exports.PDFDocument = PDFDocument;
+class ExtendedPDFDocument extends PDFDocument {
+  constructor(pdfManager, arg) {
+    super(pdfManager, arg);
+  }
+
+  get structureTree() {
+    return (0, _util.shadow)(this, 'structureTree', this.catalog.structureTree);
+  }
+
+}
+
+exports.PDFDocument = ExtendedPDFDocument;
 
 /***/ }),
 /* 10 */
@@ -4669,8 +4693,6 @@ class Catalog {
   }
 
 }
-
-exports.Catalog = Catalog;
 
 var XRef = function XRefClosure() {
   function XRef(stream, pdfManager) {
@@ -5815,6 +5837,152 @@ const ObjectLoader = function () {
 }();
 
 exports.ObjectLoader = ObjectLoader;
+
+class ExtendedCatalog extends Catalog {
+  constructor(pdfManager, xref) {
+    super(pdfManager, xref);
+    this.pages = this.getPages(this.toplevelPagesDict.get('Kids'));
+  }
+
+  _convertStructToObject(struct) {
+    if (Array.isArray(struct)) {
+      return struct.map(el => this._convertStructToObject(el));
+    } else if ((0, _primitives.isDict)(struct)) {
+      let result = {};
+      struct.getKeys().forEach(key => {
+        result[key] = this._convertStructToObject(struct.get(key));
+      });
+      return result;
+    } else if ((0, _primitives.isName)(struct)) {
+      return struct.name;
+    } else {
+      return struct;
+    }
+  }
+
+  get structTreeRoot() {
+    const structTreeRoot = this.catDict.get('StructTreeRoot');
+
+    if (!(0, _primitives.isDict)(structTreeRoot)) {
+      return null;
+    }
+
+    return (0, _util.shadow)(this, 'structTreeRoot', structTreeRoot);
+  }
+
+  getTreeElement(el, page, ref) {
+    if ((0, _primitives.isDict)(el) && el.has('Pg')) {
+      let pageRef = el.getRaw('Pg');
+      let newPage = this.pages.findIndex(el => el.num === pageRef.num && el.gen === pageRef.gen);
+      newPage = newPage !== -1 ? newPage : null;
+
+      if (newPage !== page) {
+        page = newPage;
+      }
+    }
+
+    if ((0, _primitives.isDict)(el) && el.has('K')) {
+      return {
+        name: (0, _util.stringToUTF8String)(el.get('S').name),
+        children: this.getTreeElement(el.get('K'), page, el.getRaw('K')),
+        ref: ref
+      };
+    }
+
+    if ((0, _primitives.isDict)(el) && el.has('Obj')) {
+      let obj = el.get('Obj');
+      let type = null;
+
+      if (obj.has('Type')) {
+        type = obj.get('Type').name;
+      }
+
+      if (obj.has('Subtype')) {
+        type = obj.get('Subtype').name;
+      }
+
+      switch (type) {
+        case 'Link':
+        case 'Annot':
+          let rect = obj.get('Rect');
+          return {
+            rect: [rect[0], rect[1], rect[2], rect[3]],
+            pageIndex: page
+          };
+
+        default:
+          break;
+      }
+    }
+
+    if (Array.isArray(el)) {
+      return el.map(subel => {
+        if (Number.isInteger(subel)) {
+          return {
+            mcid: subel,
+            pageIndex: page
+          };
+        } else if (!(subel.hasOwnProperty('num') && subel.hasOwnProperty('gen')) && subel.get('Type') !== 'OBJR') {
+          return this.getTreeElement(subel, page);
+        } else if (subel.hasOwnProperty('num') && subel.hasOwnProperty('gen')) {
+          return this.getTreeElement(this.xref.fetch(subel), page, subel);
+        }
+      });
+    }
+
+    if (Number.isInteger(el)) {
+      return {
+        mcid: el,
+        pageIndex: page
+      };
+    }
+
+    if ((0, _primitives.isDict)(el) && el.has('Type') && el.get('Type').name === 'MCR') {
+      return {
+        mcid: el.get('MCID'),
+        pageIndex: page
+      };
+    }
+  }
+
+  getPages(pages) {
+    let pagesArray = [];
+    pages.map(kid => {
+      if ((0, _primitives.isRef)(kid)) {
+        let kidObj = this.xref.fetch(kid);
+        let kidObjType = kidObj.get('Type').name;
+
+        switch (kidObjType) {
+          case 'Page':
+            pagesArray.push(kid);
+            break;
+
+          case 'Pages':
+            let array = this.getPages(kidObj.get('Kids'));
+            pagesArray = pagesArray.concat(array);
+            break;
+
+          default:
+            break;
+        }
+      }
+    });
+    return pagesArray;
+  }
+
+  get structureTree() {
+    let structureTree = null;
+
+    if (this.structTreeRoot && (0, _primitives.isDict)(this.structTreeRoot) && this.structTreeRoot.has('K')) {
+      structureTree = this.getTreeElement(this.structTreeRoot.get('K'), null, this.structTreeRoot.getRaw('K'));
+    }
+
+    return (0, _util.shadow)(this, 'structureTree', structureTree);
+  }
+
+}
+
+exports.Catalog = ExtendedCatalog;
 
 /***/ }),
 /* 11 */
@@ -20160,7 +20328,7 @@ exports.OperatorList = OperatorList;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.PartialEvaluator = void 0;
+exports.TextState = exports.StateManager = exports.PartialEvaluator = void 0;
 
 var _util = __w_pdfjs_require__(2);
 
@@ -20201,6 +20369,8 @@ var _murmurhash = __w_pdfjs_require__(43);
 var _operator_list = __w_pdfjs_require__(26);
 
 var _image = __w_pdfjs_require__(44);
+
+var _bounding_boxes = __w_pdfjs_require__(45);
 
 var PartialEvaluator = function PartialEvaluatorClosure() {
   const DefaultPartialEvaluatorOptions = {
@@ -20828,7 +20998,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
       }).then(translated => {
         state.font = translated.font;
         translated.send(this.handler);
-        return translated.loadedName;
+        return translated;
       });
     },
 
@@ -20892,9 +21062,9 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
 
           case "Font":
             promise = promise.then(() => {
-              return this.handleSetFont(resources, null, value[0], operatorList, task, stateManager.state).then(function (loadedName) {
-                operatorList.addDependency(loadedName);
-                gStateObj.push([key, [loadedName, value[1]]]);
+              return this.handleSetFont(resources, null, value[0], operatorList, task, stateManager.state).then(function (translated) {
+                operatorList.addDependency(translated.loadedName);
+                gStateObj.push([key, [translated.loadedName, value[1]]]);
               });
             });
             break;
@@ -21179,7 +21349,8 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
       task,
       resources,
       operatorList,
-      initialState = null
+      initialState = null,
+      intent
     }) {
       resources = resources || _primitives.Dict.empty;
       initialState = initialState || new EvalState();
@@ -21188,6 +21359,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
         throw new Error('getOperatorList: missing "operatorList" parameter');
       }
 
+      var boundingBoxCalculator = new _bounding_boxes.BoundingBoxesCalculator(intent !== 'oplist');
       var self = this;
       var xref = this.xref;
       let parsingText = false;
@@ -21302,6 +21474,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
                   }, rejectXObject);
                   return;
                 } else if (type.name === "Image") {
+                  boundingBoxCalculator.parseOperator(_util.OPS.paintXObject, [type.name]);
                   self.buildPaintImageXObject({
                     resources,
                     image: xobj,
@@ -21336,9 +21509,10 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
 
             case _util.OPS.setFont:
               var fontSize = args[1];
-              next(self.handleSetFont(resources, args, null, operatorList, task, stateManager.state).then(function (loadedName) {
-                operatorList.addDependency(loadedName);
-                operatorList.addOp(_util.OPS.setFont, [loadedName, fontSize]);
+              next(self.handleSetFont(resources, args, null, operatorList, task, stateManager.state).then(function (translated) {
+                boundingBoxCalculator.parseOperator(_util.OPS.setFont, [fontSize, translated]);
+                operatorList.addDependency(translated.loadedName);
+                operatorList.addOp(_util.OPS.setFont, [translated.loadedName, fontSize]);
               }));
               return;
 
@@ -21414,6 +21588,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
               }
 
               operatorList.addOp(_util.OPS.nextLine);
+              boundingBoxCalculator.parseOperator(_util.OPS.nextLine);
               args[0] = self.handleText(args[0], stateManager.state);
               fn = _util.OPS.showText;
               break;
@@ -21427,6 +21602,9 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
               operatorList.addOp(_util.OPS.nextLine);
               operatorList.addOp(_util.OPS.setWordSpacing, [args.shift()]);
               operatorList.addOp(_util.OPS.setCharSpacing, [args.shift()]);
+              boundingBoxCalculator.parseOperator(_util.OPS.nextLine);
+              boundingBoxCalculator.parseOperator(_util.OPS.setWordSpacing, [args.shift()]);
+              boundingBoxCalculator.parseOperator(_util.OPS.setCharSpacing, [args.shift()]);
               args[0] = self.handleText(args[0], stateManager.state);
               fn = _util.OPS.showText;
               break;
@@ -21567,13 +21745,17 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
             case _util.OPS.closePath:
             case _util.OPS.rectangle:
               self.buildPath(operatorList, fn, args, parsingText);
+              boundingBoxCalculator.parseOperator(fn, args);
+              continue;
+
+            case _util.OPS.beginMarkedContent:
+            case _util.OPS.beginMarkedContentProps:
+            case _util.OPS.endMarkedContent:
+              boundingBoxCalculator.parseOperator(fn, args);
               continue;
 
             case _util.OPS.markPoint:
             case _util.OPS.markPointProps:
-            case _util.OPS.beginMarkedContent:
-            case _util.OPS.beginMarkedContentProps:
-            case _util.OPS.endMarkedContent:
             case _util.OPS.beginCompat:
             case _util.OPS.endCompat:
               continue;
@@ -21594,6 +21776,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
 
           }
 
+          boundingBoxCalculator.parseOperator(fn, args);
           operatorList.addOp(fn, args);
         }
 
@@ -21603,7 +21786,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
         }
 
         closePendingRestoreOPS();
-        resolve();
+        resolve(boundingBoxCalculator.boundingBoxes);
       }).catch(reason => {
         if (reason instanceof _util.AbortException) {
           return;
@@ -23135,6 +23318,8 @@ var StateManager = function StateManagerClosure() {
   return StateManager;
 }();
 
+exports.StateManager = StateManager;
+
 var TextState = function TextStateClosure() {
   function TextState() {
     this.ctm = new Float32Array(_util.IDENTITY_MATRIX);
@@ -23236,6 +23421,8 @@ var TextState = function TextStateClosure() {
   };
   return TextState;
 }();
+
+exports.TextState = TextState;
 
 var EvalState = function EvalStateClosure() {
   function EvalState() {
@@ -45321,6 +45508,607 @@ exports.PDFImage = PDFImage;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+exports.BoundingBoxesCalculator = void 0;
+
+var _util = __w_pdfjs_require__(2);
+
+var _evaluator = __w_pdfjs_require__(27);
+
+var _primitives = __w_pdfjs_require__(5);
+
+var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
+  function BoundingBoxesCalculator(ignoreCalculations) {
+    this.textState = new _evaluator.TextState();
+    this.graphicsStateManager = new _evaluator.StateManager(new GraphicsState());
+    this.clipping = false;
+    this.boundingBoxesStack = new BoundingBoxStack();
+    this.boundingBoxes = {};
+    this.ignoreCalculations = ignoreCalculations;
+  }
+
+  BoundingBoxesCalculator.prototype = {
+    getTopPoints: function BoundingBoxesCalculator_getTopPoints(x0, y0, x1, y1, h) {
+      let l = Math.sqrt(Math.pow(x1 - x0, 2) + Math.pow(y1 - y0, 2));
+
+      if (l === 0) {
+        return [x1 + h, y1 + h, x0 + h, y0 + h];
+      }
+
+      let e = [(x1 - x0) / l, (y1 - y0) / l];
+      let rotated_e = [-e[1], e[0]];
+      let result_vector = [rotated_e[0] * h, rotated_e[1] * h];
+      return [x1 + result_vector[0], y1 + result_vector[1], x0 + result_vector[0], y0 + result_vector[1]];
+    },
+    getTextBoundingBox: function BoundingBoxesCalculator_getTextBoundingBox(glyphs) {
+      let tx = 0;
+      let ty = 0;
+      let ctm = this.graphicsStateManager.state.ctm;
+      let descent = (this.textState.font.descent || 0) * this.textState.fontSize;
+      let ascent = (this.textState.font.ascent || 1) * this.textState.fontSize;
+      let rise = this.textState.textRise * this.textState.fontSize;
+
+      let shift = _util.Util.applyTransform([0, descent + rise], this.textState.textMatrix);
+
+      shift[0] -= this.textState.textMatrix[4];
+      shift[1] -= this.textState.textMatrix[5];
+
+      let height = _util.Util.applyTransform([0, ascent + rise], this.textState.textMatrix);
+
+      height[0] -= this.textState.textMatrix[4] + shift[0];
+      height[1] -= this.textState.textMatrix[5] + shift[1];
+      height = Math.sqrt(height[0] * height[0] + height[1] * height[1]);
+      let [tx0, ty0] = [this.textState.textMatrix[4] + shift[0], this.textState.textMatrix[5] + shift[1]];
+
+      for (let i = 0; i < glyphs.length; i++) {
+        let glyph = glyphs[i];
+
+        if ((0, _util.isNum)(glyph)) {
+          if (this.textState.font.vertical) {
+            ty = -glyph / 1000 * this.textState.fontSize * this.textState.textHScale;
+          } else {
+            tx = -glyph / 1000 * this.textState.fontSize * this.textState.textHScale;
+          }
+        } else {
+          let glyphWidth = null;
+
+          if (this.textState.font.vertical && glyph.vmetric) {
+            glyphWidth = glyph.vmetric[0];
+          } else {
+            glyphWidth = glyph.width;
+          }
+
+          if (!this.textState.font.vertical) {
+            let w0 = glyphWidth * (this.textState.fontMatrix ? this.textState.fontMatrix[0] : 1 / 1000);
+            tx = (w0 * this.textState.fontSize + this.textState.charSpacing + (glyph.isSpace ? this.textState.wordSpacing : 0)) * this.textState.textHScale;
+          } else {
+            let w1 = glyphWidth * (this.textState.fontMatrix ? this.textState.fontMatrix[0] : 1 / 1000);
+            ty = w1 * this.textState.fontSize + this.textState.charSpacing + (glyph.isSpace ? this.textState.wordSpacing : 0);
+          }
+        }
+
+        this.textState.translateTextMatrix(tx, ty);
+      }
+
+      let [tx1, ty1] = [this.textState.textMatrix[4] + shift[0], this.textState.textMatrix[5] + shift[1]];
+      let [tx2, ty2, tx3, ty3] = this.getTopPoints(tx0, ty0, this.textState.textMatrix[4] + shift[0], this.textState.textMatrix[5] + shift[1], height);
+
+      let [x0, y0] = _util.Util.applyTransform([tx0, ty0], ctm);
+
+      let [x1, y1] = _util.Util.applyTransform([tx1, ty1], ctm);
+
+      let [x2, y2] = _util.Util.applyTransform([tx2, ty2], ctm);
+
+      let [x3, y3] = _util.Util.applyTransform([tx3, ty3], ctm);
+
+      let minX = Math.min(x0, x1, x2, x3);
+      let maxX = Math.max(x0, x1, x2, x3);
+      let minY = Math.min(y0, y1, y2, y3);
+      let maxY = Math.max(y0, y1, y2, y3);
+      this.boundingBoxesStack.save(minX, minY, maxX - minX, maxY - minY);
+    },
+    getClippingGraphicsBoundingBox: function BoundingBoxesCalculator_getClippingGraphicsBoundingBox() {
+      let state = this.graphicsStateManager.state;
+
+      if (state.clip === null) {
+        return {
+          x: state.x,
+          y: state.y,
+          w: state.w,
+          h: state.h
+        };
+      }
+
+      if (state.x < state.clip.x && state.x + state.w < state.clip.x || state.x > state.clip.x + state.clip.w && state.x + state.w > state.clip.x + state.clip.w || state.y < state.clip.y && state.y + state.h < state.clip.y || state.y > state.clip.y + state.clip.h && state.y + state.h > state.clip.y + state.clip.h) {
+        return null;
+      }
+
+      return {
+        x: Math.max(state.x, state.clip.x),
+        y: Math.max(state.y, state.clip.y),
+        w: Math.min(state.x + state.w, state.clip.x + state.clip.w) - Math.max(state.x, state.clip.x),
+        h: Math.min(state.y + state.h, state.clip.y + state.clip.h) - Math.max(state.y, state.clip.y)
+      };
+    },
+    saveGraphicsBoundingBox: function saveGraphicsBoundingBox() {
+      let clippingBBox = this.getClippingGraphicsBoundingBox();
+
+      if (clippingBBox === null) {
+        return;
+      }
+
+      let x = clippingBBox.x;
+      let y = clippingBBox.y;
+      let w = clippingBBox.w;
+      let h = clippingBBox.h;
+      this.boundingBoxesStack.save(x, y, w, h);
+    },
+    getRectBoundingBox: function getRectBoundingBox(x, y, w, h) {
+      let state = this.graphicsStateManager.state;
+
+      let [x1, y1] = _util.Util.applyTransform([x, y], state.ctm);
+
+      let [x2, y2] = _util.Util.applyTransform([x + w, y], state.ctm);
+
+      let [x3, y3] = _util.Util.applyTransform([x, y + h], state.ctm);
+
+      let [x4, y4] = _util.Util.applyTransform([x + w, y + h], state.ctm);
+
+      x = Math.min(x1, x2, x3, x4);
+      y = Math.min(y1, y2, y3, y4);
+      w = Math.max(x1, x2, x3, x4) - x;
+      h = Math.max(y1, y2, y3, y4) - y;
+
+      if (state.w === null) {
+        state.w = Math.abs(w);
+      } else {
+        state.w = Math.max(state.x + state.w, x, x + w) - Math.min(state.x, x, x + w);
+      }
+
+      if (state.h === null) {
+        state.h = Math.abs(h);
+      } else {
+        state.h = Math.max(state.y + state.h, y, y + h) - Math.min(state.y, y, y + h);
+      }
+
+      if (state.x === null) {
+        state.x = Math.min(x, x + w);
+      } else {
+        state.x = Math.min(state.x, x, x + w);
+      }
+
+      if (state.y === null) {
+        state.y = Math.min(y, y + h);
+      } else {
+        state.y = Math.min(state.y, y, y + h);
+      }
+    },
+    getLineBoundingBox: function getLineBoundingBox(x, y) {
+      let state = this.graphicsStateManager.state;
+      [x, y] = _util.Util.applyTransform([x, y], state.ctm);
+
+      if (state.w === null) {
+        state.w = Math.abs(x - state.move_x);
+      } else {
+        state.w = Math.max(x, state.move_x, state.x + state.w) - Math.min(x, state.move_x, state.x);
+      }
+
+      if (state.h === null) {
+        state.h = Math.abs(y - state.move_y);
+      } else {
+        state.h = Math.max(y, state.move_y, state.y + state.h) - Math.min(y, state.move_y, state.y);
+      }
+
+      if (state.x === null) {
+        state.x = Math.min(x, state.move_x);
+      } else {
+        state.x = Math.min(x, state.move_x, state.x);
+      }
+
+      if (state.y === null) {
+        state.y = Math.min(y, state.move_y);
+      } else {
+        state.y = Math.min(y, state.move_y, state.y);
+      }
+
+      state.move_x = x;
+      state.move_y = y;
+    },
+    getCurve: function getCurve(a, b, c, d) {
+      return function curve(t) {
+        return Math.pow(1 - t, 3) * a + 3 * t * Math.pow(1 - t, 2) * b + 3 * t * t * (1 - t) * c + t * t * t * d;
+      };
+    },
+    getCurveRoots: function getCurveRoots(a, b, c, d) {
+      let sqrt;
+      let root_1;
+      let root_2;
+      sqrt = Math.pow(6 * a - 12 * b + 6 * c, 2) - 4 * (3 * b - 3 * a) * (-3 * a + 9 * b - 9 * c + 3 * d);
+      root_1 = null;
+      root_2 = null;
+
+      if (Math.abs(a + 3 * c - 3 * b - d) > Math.pow(0.1, -10)) {
+        if (sqrt >= 0) {
+          root_1 = (-6 * a + 12 * b - 6 * c + Math.sqrt(sqrt)) / (2 * (-3 * a + 9 * b - 9 * c + 3 * d));
+          root_2 = (-6 * a + 12 * b - 6 * c - Math.sqrt(sqrt)) / (2 * (-3 * a + 9 * b - 9 * c + 3 * d));
+        }
+      } else if (sqrt > Math.pow(0.1, -10)) {
+        root_1 = (a - b) / (2 * a - 4 * b + 2 * c);
+      }
+
+      if (root_1 !== null && (root_1 < 0 || root_1 > 1)) {
+        root_1 = null;
+      }
+
+      if (root_2 !== null && (root_2 < 0 || root_2 > 1)) {
+        root_2 = null;
+      }
+
+      return [root_1, root_2];
+    },
+    getCurveBoundingBox: function getCurveBoundingBox(op, x0, y0, x1, y1, x2, y2, x3, y3) {
+      let state = this.graphicsStateManager.state;
+
+      if (op !== _util.OPS.curveTo2) {
+        [x1, y1] = _util.Util.applyTransform([x1, y1], state.ctm);
+      }
+
+      [x2, y2] = _util.Util.applyTransform([x2, y2], state.ctm);
+      [x3, y3] = _util.Util.applyTransform([x3, y3], state.ctm);
+      let curveX = this.getCurve(x0, x1, x2, x3);
+      let curveY = this.getCurve(y0, y1, y2, y3);
+      let [root_1, root_2] = this.getCurveRoots(x0, x1, x2, x3);
+      let minX = Math.min(x0, x3, root_1 !== null ? curveX(root_1) : Number.MAX_VALUE, root_2 !== null ? curveX(root_2) : Number.MAX_VALUE);
+      let maxX = Math.max(x0, x3, root_1 !== null ? curveX(root_1) : Number.MIN_VALUE, root_2 !== null ? curveX(root_2) : Number.MIN_VALUE);
+      [root_1, root_2] = this.getCurveRoots(y0, y1, y2, y3);
+      let minY = Math.min(y0, y3, root_1 !== null ? curveY(root_1) : Number.MAX_VALUE, root_2 !== null ? curveY(root_2) : Number.MAX_VALUE);
+      let maxY = Math.max(y0, y3, root_1 !== null ? curveY(root_1) : Number.MIN_VALUE, root_2 !== null ? curveY(root_2) : Number.MIN_VALUE);
+      let x = minX;
+      let y = minY;
+      let h = maxY - minY;
+      let w = maxX - minX;
+
+      if (state.w === null) {
+        state.w = Math.abs(w);
+      } else {
+        state.w = Math.max(state.x + state.w, x, x + w) - Math.min(state.x, x, x + w);
+      }
+
+      if (state.h === null) {
+        state.h = Math.abs(h);
+      } else {
+        state.h = Math.max(state.y + state.h, y, y + h) - Math.min(state.y, y, y + h);
+      }
+
+      if (state.x === null) {
+        state.x = Math.min(x, x + w);
+      } else {
+        state.x = Math.min(state.x, x, x + w);
+      }
+
+      if (state.y === null) {
+        state.y = Math.min(y, y + h);
+      } else {
+        state.y = Math.min(state.y, y, y + h);
+      }
+
+      state.move_x = x;
+      state.move_y = y;
+    },
+    getClip: function getClip() {
+      if (this.clipping) {
+        let state = this.graphicsStateManager.state;
+
+        if (state.clip === null) {
+          state.clip = {
+            x: state.x,
+            y: state.y,
+            w: state.w,
+            h: state.h
+          };
+        } else {
+          state.clip = {
+            x: Math.max(state.x, state.clip.x),
+            y: Math.max(state.y, state.clip.y),
+            w: Math.min(state.x + state.w, state.clip.x + state.clip.w) - Math.max(state.x, state.clip.x),
+            h: Math.min(state.y + state.h, state.clip.y + state.clip.h) - Math.max(state.y, state.clip.y)
+          };
+        }
+
+        this.clipping = false;
+      }
+    },
+    getImageBoundingBox: function getImageBoundingBox() {
+      let state = this.graphicsStateManager.state;
+
+      let [x0, y0] = _util.Util.applyTransform([0, 0], state.ctm);
+
+      let [x1, y1] = _util.Util.applyTransform([0, 1], state.ctm);
+
+      let [x2, y2] = _util.Util.applyTransform([1, 1], state.ctm);
+
+      let [x3, y3] = _util.Util.applyTransform([1, 0], state.ctm);
+
+      state.x = Math.min(x0, x1, x2, x3);
+      state.y = Math.min(y0, y1, y2, y3);
+      state.w = Math.max(x0, x1, x2, x3) - state.x;
+      state.h = Math.max(y0, y1, y2, y3) - state.y;
+    },
+    parseOperator: function BoundingBoxesCalculator_parseOperator(fn, args) {
+      if (this.ignoreCalculations) {
+        return;
+      }
+
+      switch (fn | 0) {
+        case _util.OPS.restore:
+          this.graphicsStateManager.restore();
+          break;
+
+        case _util.OPS.save:
+          this.graphicsStateManager.save();
+          break;
+
+        case _util.OPS.fill:
+        case _util.OPS.eoFill:
+        case _util.OPS.eoFillStroke:
+        case _util.OPS.fillStroke:
+        case _util.OPS.stroke:
+        case _util.OPS.closeEOFillStroke:
+        case _util.OPS.closeFillStroke:
+        case _util.OPS.closeStroke:
+          this.getClip();
+          this.saveGraphicsBoundingBox();
+          break;
+
+        case _util.OPS.endPath:
+          this.getClip();
+          this.graphicsStateManager.state.clean();
+          break;
+
+        case _util.OPS.transform:
+          this.graphicsStateManager.state.ctm = _util.Util.transform(this.graphicsStateManager.state.ctm, args);
+          break;
+
+        case _util.OPS.clip:
+        case _util.OPS.eoClip:
+          this.clipping = true;
+          break;
+
+        case _util.OPS.setFont:
+          this.textState.fontSize = args[0];
+          this.textState.fontMatrix = args[1].font.fontMatrix;
+          this.textState.font = args[1].font;
+          break;
+
+        case _util.OPS.setTextMatrix:
+          this.textState.setTextMatrix(args[0], args[1], args[2], args[3], args[4], args[5]);
+          this.textState.setTextLineMatrix(args[0], args[1], args[2], args[3], args[4], args[5]);
+          break;
+
+        case _util.OPS.nextLine:
+          this.textState.carriageReturn();
+          break;
+
+        case _util.OPS.setCharSpacing:
+          this.textState.charSpacing = args[0];
+          break;
+
+        case _util.OPS.setWordSpacing:
+          this.textState.wordSpacing = args[0];
+          break;
+
+        case _util.OPS.setHScale:
+          this.textState.textHScale = args[0] / 100;
+          break;
+
+        case _util.OPS.setLeading:
+          this.textState.leading = args[0];
+          break;
+
+        case _util.OPS.setTextRise:
+          this.textState.textRise = args[0];
+          break;
+
+        case _util.OPS.setLeadingMoveText:
+          this.textState.leading = -args[1];
+          this.textState.translateTextLineMatrix(...args);
+          this.textState.textMatrix = this.textState.textLineMatrix.slice();
+          break;
+
+        case _util.OPS.moveText:
+          this.textState.translateTextLineMatrix(args[0], args[1]);
+          this.textState.textMatrix = this.textState.textLineMatrix.slice();
+          break;
+
+        case _util.OPS.beginText:
+          this.textState.textMatrix = _util.IDENTITY_MATRIX.slice();
+          this.textState.textLineMatrix = _util.IDENTITY_MATRIX.slice();
+          break;
+
+        case _util.OPS.moveTo:
+          let ctm = this.graphicsStateManager.state.ctm.slice();
+          [this.graphicsStateManager.state.move_x, this.graphicsStateManager.state.move_y] = _util.Util.applyTransform(args, ctm);
+          break;
+
+        case _util.OPS.lineTo:
+          this.getLineBoundingBox(args[0], args[1]);
+          break;
+
+        case _util.OPS.curveTo:
+          this.getCurveBoundingBox(_util.OPS.curveTo, this.graphicsStateManager.state.move_x, this.graphicsStateManager.state.move_y, args[0], args[1], args[2], args[3], args[4], args[5]);
+          break;
+
+        case _util.OPS.curveTo2:
+          this.getCurveBoundingBox(_util.OPS.curveTo2, this.graphicsStateManager.state.move_x, this.graphicsStateManager.state.move_y, this.graphicsStateManager.state.move_x, this.graphicsStateManager.state.move_y, args[0], args[1], args[2], args[3]);
+          break;
+
+        case _util.OPS.curveTo3:
+          this.getCurveBoundingBox(_util.OPS.curveTo3, this.graphicsStateManager.state.move_x, this.graphicsStateManager.state.move_y, args[0], args[1], args[2], args[3], args[2], args[3]);
+          break;
+
+        case _util.OPS.rectangle:
+          this.getRectBoundingBox(args[0], args[1], args[2], args[3]);
+          break;
+
+        case _util.OPS.markPoint:
+        case _util.OPS.markPointProps:
+        case _util.OPS.beginMarkedContent:
+          this.boundingBoxesStack.begin();
+          break;
+
+        case _util.OPS.beginMarkedContentProps:
+          if ((0, _primitives.isDict)(args[1]) && args[1].has('MCID')) {
+            this.boundingBoxesStack.begin(args[1].get('MCID'));
+            this.graphicsStateManager.state.x = null;
+            this.graphicsStateManager.state.y = null;
+            this.graphicsStateManager.state.w = null;
+            this.graphicsStateManager.state.h = null;
+          } else {
+            this.boundingBoxesStack.begin();
+          }
+
+          break;
+
+        case _util.OPS.endMarkedContent:
+          let boundingBox = this.boundingBoxesStack.end();
+
+          if (boundingBox !== null) {
+            this.boundingBoxes[boundingBox.mcid] = {
+              x: boundingBox.x,
+              y: boundingBox.y,
+              width: boundingBox.w,
+              height: boundingBox.h
+            };
+          }
+
+          break;
+
+        case _util.OPS.paintXObject:
+          if (args[0] === 'Image') {
+            this.getImageBoundingBox();
+            this.saveGraphicsBoundingBox();
+          }
+
+          break;
+
+        case _util.OPS.showText:
+          this.getTextBoundingBox(args[0]);
+          break;
+
+        default:
+          break;
+      }
+    },
+    setFont: function BoundingBoxesCalculator_setFont(translated) {
+      this.textState.fontMatrix = translated.font.fontMatrix;
+      this.textState.font = translated.font;
+    }
+  };
+  return BoundingBoxesCalculator;
+}();
+
+exports.BoundingBoxesCalculator = BoundingBoxesCalculator;
+
+var GraphicsState = function GraphicsState() {
+  function GraphicsState() {
+    this.x = null;
+    this.y = null;
+    this.w = null;
+    this.h = null;
+    this.move_x = null;
+    this.move_y = null;
+    this.ctm = _util.IDENTITY_MATRIX.slice();
+    this.clip = null;
+  }
+
+  GraphicsState.prototype = {
+    clone: function GraphicsState_clone() {
+      var clone = Object.create(this);
+      clone.ctm = this.ctm.slice();
+      return clone;
+    },
+    clean: function GraphicsState_clear() {
+      this.x = null;
+      this.y = null;
+      this.w = null;
+      this.h = null;
+      this.move_x = 0;
+      this.move_y = 0;
+      this.ctm = _util.IDENTITY_MATRIX.slice();
+    }
+  };
+  return GraphicsState;
+}();
+
+var BoundingBoxStack = function BoundingBoxStack() {
+  function BoundingBoxStack() {
+    this.stack = [];
+  }
+
+  BoundingBoxStack.prototype = {
+    begin: function BoundingBoxStack_begin(mcid) {
+      this.stack.push({
+        x: null,
+        y: null,
+        w: null,
+        h: null,
+        mcid: Number.isInteger(mcid) ? mcid : null
+      });
+    },
+    save: function BoundingBoxStack_save(x, y, w, h) {
+      let current = this.stack[this.stack.length - 1];
+
+      if (!current) {
+        return;
+      }
+
+      if (current.w === null) {
+        current.w = w;
+      } else {
+        current.w = Math.max(current.x + current.w, x + w) - Math.min(current.x, x);
+      }
+
+      if (current.x === null) {
+        current.x = x;
+      } else {
+        current.x = Math.min(current.x, x);
+      }
+
+      if (current.h === null) {
+        current.h = h;
+      } else {
+        current.h = Math.max(current.y + current.h, y + h) - Math.min(current.y, y);
+      }
+
+      if (current.y === null) {
+        current.y = y;
+      } else {
+        current.y = Math.min(current.y, y);
+      }
+    },
+    end: function BoundingBoxStack_end() {
+      let last = this.stack.pop();
+
+      if (last.mcid !== null) {
+        return last;
+      } else {
+        this.save(last.x, last.y, last.w, last.h);
+        return null;
+      }
+    }
+  };
+  return BoundingBoxStack;
+}();
+
+/***/ }),
+/* 46 */
+/***/ (function(module, exports, __w_pdfjs_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
 exports.MessageHandler = void 0;
 
 var _util = __w_pdfjs_require__(2);
@@ -45813,7 +46601,7 @@ class MessageHandler {
 exports.MessageHandler = MessageHandler;
 
 /***/ }),
-/* 46 */
+/* 47 */
 /***/ (function(module, exports, __w_pdfjs_require__) {
 
 "use strict";
