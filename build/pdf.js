@@ -126,16 +126,28 @@ return /******/ (function(modules) { // webpackBootstrap
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-Object.defineProperty(exports, "addLinkAttributes", {
+Object.defineProperty(exports, "AnnotationLayer", {
   enumerable: true,
   get: function () {
-    return _display_utils.addLinkAttributes;
+    return _annotation_layer.AnnotationLayer;
   }
 });
-Object.defineProperty(exports, "getFilenameFromUrl", {
+Object.defineProperty(exports, "CMapCompressionType", {
   enumerable: true,
   get: function () {
-    return _display_utils.getFilenameFromUrl;
+    return _util.CMapCompressionType;
+  }
+});
+Object.defineProperty(exports, "GlobalWorkerOptions", {
+  enumerable: true,
+  get: function () {
+    return _worker_options.GlobalWorkerOptions;
+  }
+});
+Object.defineProperty(exports, "InvalidPDFException", {
+  enumerable: true,
+  get: function () {
+    return _util.InvalidPDFException;
   }
 });
 Object.defineProperty(exports, "LinkTarget", {
@@ -144,40 +156,22 @@ Object.defineProperty(exports, "LinkTarget", {
     return _display_utils.LinkTarget;
   }
 });
-Object.defineProperty(exports, "loadScript", {
-  enumerable: true,
-  get: function () {
-    return _display_utils.loadScript;
-  }
-});
-Object.defineProperty(exports, "PDFDateString", {
-  enumerable: true,
-  get: function () {
-    return _display_utils.PDFDateString;
-  }
-});
-Object.defineProperty(exports, "RenderingCancelledException", {
-  enumerable: true,
-  get: function () {
-    return _display_utils.RenderingCancelledException;
-  }
-});
-Object.defineProperty(exports, "build", {
-  enumerable: true,
-  get: function () {
-    return _api.build;
-  }
-});
-Object.defineProperty(exports, "getDocument", {
-  enumerable: true,
-  get: function () {
-    return _api.getDocument;
-  }
-});
 Object.defineProperty(exports, "LoopbackPort", {
   enumerable: true,
   get: function () {
     return _api.LoopbackPort;
+  }
+});
+Object.defineProperty(exports, "MissingPDFException", {
+  enumerable: true,
+  get: function () {
+    return _util.MissingPDFException;
+  }
+});
+Object.defineProperty(exports, "OPS", {
+  enumerable: true,
+  get: function () {
+    return _util.OPS;
   }
 });
 Object.defineProperty(exports, "PDFDataRangeTransport", {
@@ -186,22 +180,82 @@ Object.defineProperty(exports, "PDFDataRangeTransport", {
     return _api.PDFDataRangeTransport;
   }
 });
+Object.defineProperty(exports, "PDFDateString", {
+  enumerable: true,
+  get: function () {
+    return _display_utils.PDFDateString;
+  }
+});
 Object.defineProperty(exports, "PDFWorker", {
   enumerable: true,
   get: function () {
     return _api.PDFWorker;
   }
 });
-Object.defineProperty(exports, "version", {
+Object.defineProperty(exports, "PasswordResponses", {
   enumerable: true,
   get: function () {
-    return _api.version;
+    return _util.PasswordResponses;
   }
 });
-Object.defineProperty(exports, "CMapCompressionType", {
+Object.defineProperty(exports, "PermissionFlag", {
   enumerable: true,
   get: function () {
-    return _util.CMapCompressionType;
+    return _util.PermissionFlag;
+  }
+});
+Object.defineProperty(exports, "RenderingCancelledException", {
+  enumerable: true,
+  get: function () {
+    return _display_utils.RenderingCancelledException;
+  }
+});
+Object.defineProperty(exports, "SVGGraphics", {
+  enumerable: true,
+  get: function () {
+    return _svg.SVGGraphics;
+  }
+});
+Object.defineProperty(exports, "UNSUPPORTED_FEATURES", {
+  enumerable: true,
+  get: function () {
+    return _util.UNSUPPORTED_FEATURES;
+  }
+});
+Object.defineProperty(exports, "UnexpectedResponseException", {
+  enumerable: true,
+  get: function () {
+    return _util.UnexpectedResponseException;
+  }
+});
+Object.defineProperty(exports, "Util", {
+  enumerable: true,
+  get: function () {
+    return _util.Util;
+  }
+});
+Object.defineProperty(exports, "VerbosityLevel", {
+  enumerable: true,
+  get: function () {
+    return _util.VerbosityLevel;
+  }
+});
+Object.defineProperty(exports, "addLinkAttributes", {
+  enumerable: true,
+  get: function () {
+    return _display_utils.addLinkAttributes;
+  }
+});
+Object.defineProperty(exports, "apiCompatibilityParams", {
+  enumerable: true,
+  get: function () {
+    return _api_compatibility.apiCompatibilityParams;
+  }
+});
+Object.defineProperty(exports, "build", {
+  enumerable: true,
+  get: function () {
+    return _api.build;
   }
 });
 Object.defineProperty(exports, "createObjectURL", {
@@ -222,34 +276,22 @@ Object.defineProperty(exports, "createValidAbsoluteUrl", {
     return _util.createValidAbsoluteUrl;
   }
 });
-Object.defineProperty(exports, "InvalidPDFException", {
+Object.defineProperty(exports, "getDocument", {
   enumerable: true,
   get: function () {
-    return _util.InvalidPDFException;
+    return _api.getDocument;
   }
 });
-Object.defineProperty(exports, "MissingPDFException", {
+Object.defineProperty(exports, "getFilenameFromUrl", {
   enumerable: true,
   get: function () {
-    return _util.MissingPDFException;
+    return _display_utils.getFilenameFromUrl;
   }
 });
-Object.defineProperty(exports, "OPS", {
+Object.defineProperty(exports, "loadScript", {
   enumerable: true,
   get: function () {
-    return _util.OPS;
-  }
-});
-Object.defineProperty(exports, "PasswordResponses", {
-  enumerable: true,
-  get: function () {
-    return _util.PasswordResponses;
-  }
-});
-Object.defineProperty(exports, "PermissionFlag", {
-  enumerable: true,
-  get: function () {
-    return _util.PermissionFlag;
+    return _display_utils.loadScript;
   }
 });
 Object.defineProperty(exports, "removeNullCharacters", {
@@ -258,64 +300,22 @@ Object.defineProperty(exports, "removeNullCharacters", {
     return _util.removeNullCharacters;
   }
 });
-Object.defineProperty(exports, "shadow", {
-  enumerable: true,
-  get: function () {
-    return _util.shadow;
-  }
-});
-Object.defineProperty(exports, "UnexpectedResponseException", {
-  enumerable: true,
-  get: function () {
-    return _util.UnexpectedResponseException;
-  }
-});
-Object.defineProperty(exports, "UNSUPPORTED_FEATURES", {
-  enumerable: true,
-  get: function () {
-    return _util.UNSUPPORTED_FEATURES;
-  }
-});
-Object.defineProperty(exports, "Util", {
-  enumerable: true,
-  get: function () {
-    return _util.Util;
-  }
-});
-Object.defineProperty(exports, "VerbosityLevel", {
-  enumerable: true,
-  get: function () {
-    return _util.VerbosityLevel;
-  }
-});
-Object.defineProperty(exports, "AnnotationLayer", {
-  enumerable: true,
-  get: function () {
-    return _annotation_layer.AnnotationLayer;
-  }
-});
-Object.defineProperty(exports, "apiCompatibilityParams", {
-  enumerable: true,
-  get: function () {
-    return _api_compatibility.apiCompatibilityParams;
-  }
-});
-Object.defineProperty(exports, "GlobalWorkerOptions", {
-  enumerable: true,
-  get: function () {
-    return _worker_options.GlobalWorkerOptions;
-  }
-});
 Object.defineProperty(exports, "renderTextLayer", {
   enumerable: true,
   get: function () {
     return _text_layer.renderTextLayer;
   }
 });
-Object.defineProperty(exports, "SVGGraphics", {
+Object.defineProperty(exports, "shadow", {
   enumerable: true,
   get: function () {
-    return _svg.SVGGraphics;
+    return _util.shadow;
+  }
+});
+Object.defineProperty(exports, "version", {
+  enumerable: true,
+  get: function () {
+    return _api.version;
   }
 });
 
@@ -377,13 +377,13 @@ const pdfjsBuild = '0974d60';
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+exports.StatTimer = exports.RenderingCancelledException = exports.PageViewport = exports.PDFDateString = exports.LinkTarget = exports.DOMSVGFactory = exports.DOMCanvasFactory = exports.DOMCMapReaderFactory = exports.DEFAULT_LINK_REL = void 0;
 exports.addLinkAttributes = addLinkAttributes;
+exports.deprecated = deprecated;
 exports.getFilenameFromUrl = getFilenameFromUrl;
 exports.isFetchSupported = isFetchSupported;
 exports.isValidFetchUrl = isValidFetchUrl;
 exports.loadScript = loadScript;
-exports.deprecated = deprecated;
-exports.PDFDateString = exports.StatTimer = exports.DOMSVGFactory = exports.DOMCMapReaderFactory = exports.DOMCanvasFactory = exports.DEFAULT_LINK_REL = exports.LinkTarget = exports.RenderingCancelledException = exports.PageViewport = void 0;
 
 var _util = __w_pdfjs_require__(2);
 
@@ -877,11 +877,14 @@ exports.PDFDateString = PDFDateString;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+exports.VerbosityLevel = exports.Util = exports.UnknownErrorException = exports.UnexpectedResponseException = exports.UNSUPPORTED_FEATURES = exports.TextRenderingMode = exports.StreamType = exports.PermissionFlag = exports.PasswordResponses = exports.PasswordException = exports.OPS = exports.MissingPDFException = exports.IsLittleEndianCached = exports.IsEvalSupportedCached = exports.InvalidPDFException = exports.ImageKind = exports.IDENTITY_MATRIX = exports.FormatError = exports.FontType = exports.FONT_IDENTITY_MATRIX = exports.CMapCompressionType = exports.BaseException = exports.AnnotationType = exports.AnnotationStateModelType = exports.AnnotationReviewState = exports.AnnotationReplyType = exports.AnnotationMarkedState = exports.AnnotationFlag = exports.AnnotationFieldFlag = exports.AnnotationBorderStyleType = exports.AbortException = void 0;
 exports.arrayByteLength = arrayByteLength;
 exports.arraysToBytes = arraysToBytes;
 exports.assert = assert;
 exports.bytesToString = bytesToString;
+exports.createObjectURL = void 0;
 exports.createPromiseCapability = createPromiseCapability;
+exports.createValidAbsoluteUrl = createValidAbsoluteUrl;
 exports.getVerbosityLevel = getVerbosityLevel;
 exports.info = info;
 exports.isArrayBuffer = isArrayBuffer;
@@ -889,9 +892,8 @@ exports.isArrayEqual = isArrayEqual;
 exports.isBool = isBool;
 exports.isEmptyObj = isEmptyObj;
 exports.isNum = isNum;
-exports.isString = isString;
 exports.isSameOrigin = isSameOrigin;
-exports.createValidAbsoluteUrl = createValidAbsoluteUrl;
+exports.isString = isString;
 exports.removeNullCharacters = removeNullCharacters;
 exports.setVerbosityLevel = setVerbosityLevel;
 exports.shadow = shadow;
@@ -899,10 +901,9 @@ exports.string32 = string32;
 exports.stringToBytes = stringToBytes;
 exports.stringToPDFString = stringToPDFString;
 exports.stringToUTF8String = stringToUTF8String;
+exports.unreachable = unreachable;
 exports.utf8StringToString = utf8StringToString;
 exports.warn = warn;
-exports.unreachable = unreachable;
-exports.IsEvalSupportedCached = exports.IsLittleEndianCached = exports.createObjectURL = exports.FormatError = exports.Util = exports.UnknownErrorException = exports.UnexpectedResponseException = exports.TextRenderingMode = exports.StreamType = exports.PermissionFlag = exports.PasswordResponses = exports.PasswordException = exports.MissingPDFException = exports.InvalidPDFException = exports.AbortException = exports.CMapCompressionType = exports.ImageKind = exports.FontType = exports.AnnotationType = exports.AnnotationStateModelType = exports.AnnotationReviewState = exports.AnnotationReplyType = exports.AnnotationMarkedState = exports.AnnotationFlag = exports.AnnotationFieldFlag = exports.AnnotationBorderStyleType = exports.UNSUPPORTED_FEATURES = exports.VerbosityLevel = exports.OPS = exports.IDENTITY_MATRIX = exports.FONT_IDENTITY_MATRIX = exports.BaseException = void 0;
 
 __w_pdfjs_require__(3);
 
@@ -1730,9 +1731,10 @@ exports.isNodeJS = isNodeJS;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+exports.build = exports.PDFWorker = exports.PDFPageProxy = exports.PDFDocumentProxy = exports.PDFDataRangeTransport = exports.LoopbackPort = void 0;
 exports.getDocument = getDocument;
 exports.setPDFNetworkStreamFactory = setPDFNetworkStreamFactory;
-exports.build = exports.version = exports.PDFPageProxy = exports.PDFDocumentProxy = exports.PDFWorker = exports.PDFDataRangeTransport = exports.LoopbackPort = void 0;
+exports.version = void 0;
 
 var _util = __w_pdfjs_require__(2);
 
@@ -6271,8 +6273,8 @@ exports.CanvasGraphics = CanvasGraphics;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.getShadingPatternFromIR = getShadingPatternFromIR;
 exports.TilingPattern = void 0;
+exports.getShadingPatternFromIR = getShadingPatternFromIR;
 
 var _util = __w_pdfjs_require__(2);
 

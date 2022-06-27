@@ -74,7 +74,6 @@
   cursor: default;
   -webkit-user-select: none;
      -moz-user-select: none;
-      -ms-user-select: none;
           user-select: none;
 }
 
@@ -381,10 +380,6 @@
 .pdfPresentationMode .pdfViewer.removePageBorders .page {
   margin-left: auto;
   margin-right: auto;
-}
-
-.pdfPresentationMode:-ms-fullscreen .pdfViewer .page {
-  margin-bottom: 100% !important;
 }
 
 .pdfPresentationMode:-webkit-full-screen .pdfViewer .page {

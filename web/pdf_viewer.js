@@ -144,10 +144,10 @@ Object.defineProperty(exports, "DefaultTextLayerFactory", {
     return _text_layer_builder.DefaultTextLayerFactory;
   }
 });
-Object.defineProperty(exports, "TextLayerBuilder", {
+Object.defineProperty(exports, "DownloadManager", {
   enumerable: true,
   get: function () {
-    return _text_layer_builder.TextLayerBuilder;
+    return _download_manager.DownloadManager;
   }
 });
 Object.defineProperty(exports, "EventBus", {
@@ -156,40 +156,16 @@ Object.defineProperty(exports, "EventBus", {
     return _ui_utils.EventBus;
   }
 });
-Object.defineProperty(exports, "NullL10n", {
-  enumerable: true,
-  get: function () {
-    return _ui_utils.NullL10n;
-  }
-});
-Object.defineProperty(exports, "ProgressBar", {
-  enumerable: true,
-  get: function () {
-    return _ui_utils.ProgressBar;
-  }
-});
-Object.defineProperty(exports, "PDFLinkService", {
-  enumerable: true,
-  get: function () {
-    return _pdf_link_service.PDFLinkService;
-  }
-});
-Object.defineProperty(exports, "SimpleLinkService", {
-  enumerable: true,
-  get: function () {
-    return _pdf_link_service.SimpleLinkService;
-  }
-});
-Object.defineProperty(exports, "DownloadManager", {
-  enumerable: true,
-  get: function () {
-    return _download_manager.DownloadManager;
-  }
-});
 Object.defineProperty(exports, "GenericL10n", {
   enumerable: true,
   get: function () {
     return _genericl10n.GenericL10n;
+  }
+});
+Object.defineProperty(exports, "NullL10n", {
+  enumerable: true,
+  get: function () {
+    return _ui_utils.NullL10n;
   }
 });
 Object.defineProperty(exports, "PDFFindController", {
@@ -202,6 +178,12 @@ Object.defineProperty(exports, "PDFHistory", {
   enumerable: true,
   get: function () {
     return _pdf_history.PDFHistory;
+  }
+});
+Object.defineProperty(exports, "PDFLinkService", {
+  enumerable: true,
+  get: function () {
+    return _pdf_link_service.PDFLinkService;
   }
 });
 Object.defineProperty(exports, "PDFPageView", {
@@ -220,6 +202,24 @@ Object.defineProperty(exports, "PDFViewer", {
   enumerable: true,
   get: function () {
     return _pdf_viewer.PDFViewer;
+  }
+});
+Object.defineProperty(exports, "ProgressBar", {
+  enumerable: true,
+  get: function () {
+    return _ui_utils.ProgressBar;
+  }
+});
+Object.defineProperty(exports, "SimpleLinkService", {
+  enumerable: true,
+  get: function () {
+    return _pdf_link_service.SimpleLinkService;
+  }
+});
+Object.defineProperty(exports, "TextLayerBuilder", {
+  enumerable: true,
+  get: function () {
+    return _text_layer_builder.TextLayerBuilder;
   }
 });
 
@@ -386,27 +386,27 @@ module.exports = pdfjsLib;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+exports.animationStarted = exports.WaitOnType = exports.VERTICAL_PADDING = exports.UNKNOWN_SCALE = exports.TextLayerMode = exports.SpreadMode = exports.ScrollMode = exports.SCROLLBAR_PADDING = exports.RendererType = exports.ProgressBar = exports.PresentationModeState = exports.NullL10n = exports.MIN_SCALE = exports.MAX_SCALE = exports.MAX_AUTO_SCALE = exports.EventBus = exports.DEFAULT_SCALE_VALUE = exports.DEFAULT_SCALE = exports.CSS_UNITS = exports.AutoPrintRegExp = void 0;
+exports.approximateFraction = approximateFraction;
+exports.backtrackBeforeAllVisibleElements = backtrackBeforeAllVisibleElements;
+exports.binarySearchFirstItem = binarySearchFirstItem;
+exports.clamp = clamp;
+exports.getOutputScale = getOutputScale;
+exports.getPDFFileNameFromURL = getPDFFileNameFromURL;
+exports.getPageSizeInches = getPageSizeInches;
+exports.getVisibleElements = getVisibleElements;
+exports.isPortraitOrientation = isPortraitOrientation;
 exports.isValidRotation = isValidRotation;
 exports.isValidScrollMode = isValidScrollMode;
 exports.isValidSpreadMode = isValidSpreadMode;
-exports.isPortraitOrientation = isPortraitOrientation;
-exports.clamp = clamp;
-exports.getPDFFileNameFromURL = getPDFFileNameFromURL;
-exports.noContextMenuHandler = noContextMenuHandler;
-exports.parseQueryString = parseQueryString;
-exports.backtrackBeforeAllVisibleElements = backtrackBeforeAllVisibleElements;
-exports.getVisibleElements = getVisibleElements;
-exports.roundToDivide = roundToDivide;
-exports.getPageSizeInches = getPageSizeInches;
-exports.approximateFraction = approximateFraction;
-exports.getOutputScale = getOutputScale;
-exports.scrollIntoView = scrollIntoView;
-exports.watchScroll = watchScroll;
-exports.binarySearchFirstItem = binarySearchFirstItem;
-exports.normalizeWheelEventDelta = normalizeWheelEventDelta;
-exports.waitOnEventOrTimeout = waitOnEventOrTimeout;
 exports.moveToEndOfArray = moveToEndOfArray;
-exports.WaitOnType = exports.animationStarted = exports.ProgressBar = exports.EventBus = exports.NullL10n = exports.SpreadMode = exports.ScrollMode = exports.TextLayerMode = exports.RendererType = exports.PresentationModeState = exports.VERTICAL_PADDING = exports.SCROLLBAR_PADDING = exports.MAX_AUTO_SCALE = exports.UNKNOWN_SCALE = exports.MAX_SCALE = exports.MIN_SCALE = exports.DEFAULT_SCALE = exports.DEFAULT_SCALE_VALUE = exports.CSS_UNITS = exports.AutoPrintRegExp = void 0;
+exports.noContextMenuHandler = noContextMenuHandler;
+exports.normalizeWheelEventDelta = normalizeWheelEventDelta;
+exports.parseQueryString = parseQueryString;
+exports.roundToDivide = roundToDivide;
+exports.scrollIntoView = scrollIntoView;
+exports.waitOnEventOrTimeout = waitOnEventOrTimeout;
+exports.watchScroll = watchScroll;
 const CSS_UNITS = 96.0 / 72.0;
 exports.CSS_UNITS = CSS_UNITS;
 const DEFAULT_SCALE_VALUE = "auto";
@@ -1560,7 +1560,7 @@ exports.SimpleLinkService = SimpleLinkService;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.DefaultTextLayerFactory = exports.TextLayerBuilder = void 0;
+exports.TextLayerBuilder = exports.DefaultTextLayerFactory = void 0;
 
 var _pdfjsLib = __w_pdfjs_require__(2);
 
@@ -3621,8 +3621,8 @@ exports.PDFFindController = PDFFindController;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.getCharacterType = getCharacterType;
 exports.CharacterType = void 0;
+exports.getCharacterType = getCharacterType;
 const CharacterType = {
   SPACE: 0,
   ALPHA_LETTER: 1,
@@ -3717,9 +3717,9 @@ function getCharacterType(charCode) {
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.isDestHashesEqual = isDestHashesEqual;
-exports.isDestArraysEqual = isDestArraysEqual;
 exports.PDFHistory = void 0;
+exports.isDestArraysEqual = isDestArraysEqual;
+exports.isDestHashesEqual = isDestHashesEqual;
 
 var _ui_utils = __w_pdfjs_require__(3);
 
@@ -4903,7 +4903,7 @@ exports.PDFPageView = PDFPageView;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.PDFRenderingQueue = exports.RenderingStates = void 0;
+exports.RenderingStates = exports.PDFRenderingQueue = void 0;
 const CLEANUP_TIMEOUT = 30000;
 const RenderingStates = {
   INITIAL: 0,
