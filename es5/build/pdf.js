@@ -336,7 +336,7 @@ var _text_layer = __w_pdfjs_require__(210);
 var _svg = __w_pdfjs_require__(211);
 
 var pdfjsVersion = '2.5.207';
-var pdfjsBuild = '0974d605';
+var pdfjsBuild = '0974d60';
 {
   var _require = __w_pdfjs_require__(7),
       isNodeJS = _require.isNodeJS;
@@ -14514,7 +14514,7 @@ var InternalRenderTask = function InternalRenderTaskClosure() {
 
 var version = '2.5.207';
 exports.version = version;
-var build = '0974d605';
+var build = '0974d60';
 exports.build = build;
 
 /***/ }),
