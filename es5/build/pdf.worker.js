@@ -34035,6 +34035,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
                 var localImage = localImageCache.getByName(name);
 
                 if (localImage) {
+                  boundingBoxCalculator.parseOperator(_util.OPS.paintXObject, ["Image"]);
                   operatorList.addOp(localImage.fn, localImage.args);
                   args = null;
                   continue;
@@ -34052,6 +34053,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
                   var _localImage = localImageCache.getByRef(xobj);
 
                   if (_localImage) {
+                    boundingBoxCalculator.parseOperator(_util.OPS.paintXObject, ["Image"]);
                     operatorList.addOp(_localImage.fn, _localImage.args);
                     resolveXObject();
                     return;
@@ -34060,6 +34062,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
                   var globalImage = self.globalImageCache.getData(xobj, self.pageIndex);
 
                   if (globalImage) {
+                    boundingBoxCalculator.parseOperator(_util.OPS.paintXObject, ["Image"]);
                     operatorList.addDependency(globalImage.objId);
                     operatorList.addOp(globalImage.fn, globalImage.args);
                     resolveXObject();
