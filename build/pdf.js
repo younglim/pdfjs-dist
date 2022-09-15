@@ -1166,7 +1166,9 @@ const OPS = {
   paintImageXObjectRepeat: 88,
   paintImageMaskXObjectRepeat: 89,
   paintSolidColorImageMask: 90,
-  constructPath: 91
+  constructPath: 91,
+  boundingBoxes: 100,
+  operationPosition: 101
 };
 exports.OPS = OPS;
 const UNSUPPORTED_FEATURES = {

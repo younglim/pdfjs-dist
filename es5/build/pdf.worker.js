@@ -1058,7 +1058,9 @@ var OPS = {
   paintImageXObjectRepeat: 88,
   paintImageMaskXObjectRepeat: 89,
   paintSolidColorImageMask: 90,
-  constructPath: 91
+  constructPath: 91,
+  boundingBoxes: 100,
+  operationPosition: 101
 };
 exports.OPS = OPS;
 var UNSUPPORTED_FEATURES = {
@@ -14094,7 +14096,7 @@ var DEFAULT_USER_UNIT = 1.0;
 var LETTER_SIZE_MEDIABOX = [0, 0, 612, 792];
 
 function isAnnotationRenderable(annotation, intent) {
-  return intent === "display" && annotation.viewable || intent === "print" && annotation.printable;
+  return intent === "display" && annotation.viewable || intent === "print" && annotation.printable || intent === "oplist";
 }
 
 var Page = /*#__PURE__*/function () {
@@ -14309,7 +14311,7 @@ var Page = /*#__PURE__*/function () {
         pdfFunctionFactory: this.pdfFunctionFactory
       });
       var dataPromises = Promise.all([contentStreamPromise, resourcesPromise]);
-      var boundingBoxes;
+      var boundingBoxes, positionByOperationIndex;
       var pageListPromise = dataPromises.then(function (_ref3) {
         var _ref4 = _slicedToArray(_ref3, 1),
             contentStream = _ref4[0];
@@ -14326,19 +14328,25 @@ var Page = /*#__PURE__*/function () {
           resources: _this2.resources,
           operatorList: opList,
           intent: intent
-        }).then(function (boundingBoxesByMCID) {
+        }).then(function (_ref5) {
+          var _ref6 = _slicedToArray(_ref5, 2),
+              boundingBoxesByMCID = _ref6[0],
+              operationArray = _ref6[1];
+
           boundingBoxes = boundingBoxesByMCID;
+          positionByOperationIndex = operationArray;
           return opList;
         });
       });
-      return Promise.all([pageListPromise, this._parsedAnnotations]).then(function (_ref5) {
-        var _ref6 = _slicedToArray(_ref5, 2),
-            pageOpList = _ref6[0],
-            annotations = _ref6[1];
+      return Promise.all([pageListPromise, this._parsedAnnotations]).then(function (_ref7) {
+        var _ref8 = _slicedToArray(_ref7, 2),
+            pageOpList = _ref8[0],
+            annotations = _ref8[1];
 
         if (annotations.length === 0) {
           if (intent === 'oplist') {
-            pageOpList.addOp(_util.OPS.save, boundingBoxes);
+            pageOpList.addOp(_util.OPS.operationPosition, positionByOperationIndex);
+            pageOpList.addOp(_util.OPS.boundingBoxes, boundingBoxes);
           }
 
           pageOpList.flush(true);
@@ -14401,20 +14409,20 @@ var Page = /*#__PURE__*/function () {
     }
   }, {
     key: "extractTextContent",
-    value: function extractTextContent(_ref7) {
+    value: function extractTextContent(_ref9) {
       var _this3 = this;
 
-      var handler = _ref7.handler,
-          task = _ref7.task,
-          normalizeWhitespace = _ref7.normalizeWhitespace,
-          sink = _ref7.sink,
-          combineTextItems = _ref7.combineTextItems;
+      var handler = _ref9.handler,
+          task = _ref9.task,
+          normalizeWhitespace = _ref9.normalizeWhitespace,
+          sink = _ref9.sink,
+          combineTextItems = _ref9.combineTextItems;
       var contentStreamPromise = this.pdfManager.ensure(this, "getContentStream");
       var resourcesPromise = this.loadResources(["ExtGState", "XObject", "Font"]);
       var dataPromises = Promise.all([contentStreamPromise, resourcesPromise]);
-      return dataPromises.then(function (_ref8) {
-        var _ref9 = _slicedToArray(_ref8, 1),
-            contentStream = _ref9[0];
+      return dataPromises.then(function (_ref10) {
+        var _ref11 = _slicedToArray(_ref10, 1),
+            contentStream = _ref11[0];
 
         var partialEvaluator = new _evaluator.PartialEvaluator({
           xref: _this3.xref,
@@ -14881,10 +14889,10 @@ var PDFDocument = /*#__PURE__*/function () {
       var catalog = this.catalog,
           linearization = this.linearization;
       var promise = linearization && linearization.pageFirst === pageIndex ? this._getLinearizationPage(pageIndex) : catalog.getPageDict(pageIndex);
-      return this._pagePromises[pageIndex] = promise.then(function (_ref10) {
-        var _ref11 = _slicedToArray(_ref10, 2),
-            pageDict = _ref11[0],
-            ref = _ref11[1];
+      return this._pagePromises[pageIndex] = promise.then(function (_ref12) {
+        var _ref13 = _slicedToArray(_ref12, 2),
+            pageDict = _ref13[0],
+            ref = _ref13[1];
 
         return new Page({
           pdfManager: _this5.pdfManager,
@@ -14905,7 +14913,7 @@ var PDFDocument = /*#__PURE__*/function () {
       var _this6 = this;
 
       return this.getPage(0)["catch"]( /*#__PURE__*/function () {
-        var _ref12 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee(reason) {
+        var _ref14 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee(reason) {
           return _regeneratorRuntime().wrap(function _callee$(_context) {
             while (1) {
               switch (_context.prev = _context.next) {
@@ -14931,7 +14939,7 @@ var PDFDocument = /*#__PURE__*/function () {
         }));
 
         return function (_x) {
-          return _ref12.apply(this, arguments);
+          return _ref14.apply(this, arguments);
         };
       }());
     }
@@ -34026,6 +34034,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
 
           var args = operation.args;
           var fn = operation.fn;
+          boundingBoxCalculator.incrementOperation(fn);
 
           switch (fn | 0) {
             case _util.OPS.paintXObject:
@@ -34408,7 +34417,7 @@ var PartialEvaluator = function PartialEvaluatorClosure() {
         }
 
         closePendingRestoreOPS();
-        resolve(boundingBoxCalculator.boundingBoxes);
+        resolve([boundingBoxCalculator.boundingBoxes, boundingBoxCalculator.operationArray]);
       })["catch"](function (reason) {
         if (reason instanceof _util.AbortException) {
           return;
@@ -58388,6 +58397,8 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
     this.boundingBoxesStack = new BoundingBoxStack();
     this.boundingBoxes = {};
     this.ignoreCalculations = ignoreCalculations;
+    this.operationArray = [];
+    this.operationIndex = -1;
   }
 
   BoundingBoxesCalculator.prototype = {
@@ -58404,6 +58415,8 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
       return [x1 + result_vector[0], y1 + result_vector[1], x0 + result_vector[0], y0 + result_vector[1]];
     },
     getTextBoundingBox: function BoundingBoxesCalculator_getTextBoundingBox(glyphs) {
+      var _this = this;
+
       var tx = 0;
       var ty = 0;
       var ctm = this.graphicsStateManager.state.ctm;
@@ -58423,6 +58436,7 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
       height = Math.sqrt(height[0] * height[0] + height[1] * height[1]);
       var tx0 = this.textStateManager.state.textMatrix[4] + shift[0],
           ty0 = this.textStateManager.state.textMatrix[5] + shift[1];
+      var glyphsSize = [];
 
       for (var i = 0; i < glyphs.length; i++) {
         var glyph = glyphs[i];
@@ -58451,7 +58465,13 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
           }
         }
 
+        var x = this.textStateManager.state.textMatrix[4] + shift[0],
+            y = this.textStateManager.state.textMatrix[5] + shift[1];
         this.textStateManager.state.translateTextMatrix(tx, ty);
+
+        if (!(0, _util.isNum)(glyph)) {
+          glyphsSize.push([x, y, this.textStateManager.state.textMatrix[4] + shift[0], this.textStateManager.state.textMatrix[5] + shift[1]]);
+        }
       }
 
       var tx1 = this.textStateManager.state.textMatrix[4] + shift[0],
@@ -58464,11 +58484,20 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
           tx3 = _this$getTopPoints2[2],
           ty3 = _this$getTopPoints2[3];
 
+      glyphsSize = glyphsSize.map(function (glyphSize) {
+        return [].concat(_toConsumableArray(glyphSize), _toConsumableArray(_this.getTopPoints.apply(_this, _toConsumableArray(glyphSize).concat([height]))));
+      });
+
       if (this.textStateManager.state.textMatrix[3] < 0) {
         ty0 += height * this.textStateManager.state.textMatrix[3];
         ty1 += height * this.textStateManager.state.textMatrix[3];
         ty2 += height * this.textStateManager.state.textMatrix[3];
         ty3 += height * this.textStateManager.state.textMatrix[3];
+        glyphsSize = glyphsSize.map(function (glyphSize) {
+          return _toConsumableArray(glyphSize.map(function (point, index) {
+            return index % 2 === 0 ? point : point + height * _this.textStateManager.state.textMatrix[3];
+          }));
+        });
       }
 
       var _Util$applyTransform = _util.Util.applyTransform([tx0, ty0], ctm),
@@ -58491,10 +58520,31 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
           x3 = _Util$applyTransform8[0],
           y3 = _Util$applyTransform8[1];
 
-      var minX = Math.min(x0, x1, x2, x3);
-      var maxX = Math.max(x0, x1, x2, x3);
-      var minY = Math.min(y0, y1, y2, y3);
-      var maxY = Math.max(y0, y1, y2, y3);
+      glyphsSize = glyphsSize.map(function (glyphSize) {
+        return [].concat(_toConsumableArray(_util.Util.applyTransform([glyphSize[0], glyphSize[1]], ctm)), _toConsumableArray(_util.Util.applyTransform([glyphSize[2], glyphSize[3]], ctm)), _toConsumableArray(_util.Util.applyTransform([glyphSize[4], glyphSize[5]], ctm)), _toConsumableArray(_util.Util.applyTransform([glyphSize[6], glyphSize[7]], ctm)));
+      });
+      var minX, maxX, minY, maxY;
+      var glyphsPos = [];
+      glyphsSize.forEach(function (glyphSize) {
+        var xPoints = _toConsumableArray(glyphSize).filter(function (point, index) {
+          return index % 2 === 0;
+        });
+
+        var yPoints = _toConsumableArray(glyphSize).filter(function (point, index) {
+          return index % 2 !== 0;
+        });
+
+        minX = Math.min.apply(Math, _toConsumableArray(xPoints));
+        maxX = Math.max.apply(Math, _toConsumableArray(xPoints));
+        minY = Math.min.apply(Math, _toConsumableArray(yPoints));
+        maxY = Math.max.apply(Math, _toConsumableArray(yPoints));
+        glyphsPos.push([minX, minY, maxX - minX, maxY - minY]);
+      });
+      this.operationArray[this.operationIndex] = glyphsPos;
+      minX = Math.min(x0, x1, x2, x3);
+      maxX = Math.max(x0, x1, x2, x3);
+      minY = Math.min(y0, y1, y2, y3);
+      maxY = Math.max(y0, y1, y2, y3);
       this.boundingBoxesStack.save(minX, minY, maxX - minX, maxY - minY);
     },
     getClippingGraphicsBoundingBox: function BoundingBoxesCalculator_getClippingGraphicsBoundingBox() {
@@ -58961,6 +59011,13 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
     setFont: function BoundingBoxesCalculator_setFont(translated) {
       this.textStateManager.state.fontMatrix = translated.font.fontMatrix;
       this.textStateManager.state.font = translated.font;
+    },
+    incrementOperation: function BoundingBoxesCalculator_incrementOperation(fn) {
+      if (this.ignoreCalculations) {
+        return;
+      }
+
+      this.operationIndex++;
     }
   };
   return BoundingBoxesCalculator;
