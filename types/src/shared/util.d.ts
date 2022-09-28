@@ -341,8 +341,6 @@ export namespace OPS {
     const paintImageMaskXObjectRepeat: number;
     const paintSolidColorImageMask: number;
     const constructPath: number;
-    const boundingBoxes: number;
-    const operationPosition: number;
 }
 export namespace PageActionEventType {
     export const O: string;

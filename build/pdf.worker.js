@@ -1056,9 +1056,7 @@ const OPS = {
   paintImageXObjectRepeat: 88,
   paintImageMaskXObjectRepeat: 89,
   paintSolidColorImageMask: 90,
-  constructPath: 91,
-  boundingBoxes: 100,
-  operationPosition: 101
+  constructPath: 91
 };
 exports.OPS = OPS;
 const UNSUPPORTED_FEATURES = {
@@ -3920,7 +3918,7 @@ class Page {
       options: this.evaluatorOptions
     });
     const dataPromises = Promise.all([contentStreamPromise, resourcesPromise]);
-    let boundingBoxes, positionByOperationIndex;
+    let boundingBoxes;
     const pageListPromise = dataPromises.then(([contentStream]) => {
       const opList = new _operator_list.OperatorList(intent, sink);
       handler.send("StartRenderPage", {
@@ -3934,17 +3932,15 @@ class Page {
         resources: this.resources,
         operatorList: opList,
         intent
-      }).then(function ([boundingBoxesByMCID, operationArray]) {
+      }).then(function (boundingBoxesByMCID) {
         boundingBoxes = boundingBoxesByMCID;
-        positionByOperationIndex = operationArray;
         return opList;
       });
     });
     return Promise.all([pageListPromise, this._parsedAnnotations]).then(function ([pageOpList, annotations]) {
       if (annotations.length === 0 || intent & _util.RenderingIntentFlag.ANNOTATIONS_DISABLE) {
         if (intent & _util.RenderingIntentFlag.OPLIST) {
-          pageOpList.addOp(_util.OPS.operationPosition, positionByOperationIndex);
-          pageOpList.addOp(_util.OPS.boundingBoxes, boundingBoxes);
+          pageOpList.addOp(_util.OPS.save, boundingBoxes);
         }
 
         pageOpList.flush(true);
@@ -3960,7 +3956,7 @@ class Page {
       const opListPromises = [];
 
       for (const annotation of annotations) {
-        if (intentAny || intentDisplay && annotation.mustBeViewed(annotationStorage) || intentPrint && annotation.mustBePrinted(annotationStorage) || intent & _util.RenderingIntentFlag.OPLIST) {
+        if (intentAny || intentDisplay && annotation.mustBeViewed(annotationStorage) || intentPrint && annotation.mustBePrinted(annotationStorage)) {
           opListPromises.push(annotation.getOperatorList(partialEvaluator, task, intent, renderForms, annotationStorage).catch(function (reason) {
             (0, _util.warn)("getOperatorList - ignoring annotation data during " + `"${task.name}" task: "${reason}".`);
             return null;
@@ -3977,7 +3973,7 @@ class Page {
 
         pageOpList.addOp(_util.OPS.endAnnotations, []);
 
-        if (intent & _util.RenderingIntentFlag.OPLIST) {
+        if (intent === 'oplist') {
           pageOpList.addOp(_util.OPS.save, boundingBoxes);
         }
 
@@ -4053,7 +4049,7 @@ class Page {
             intentPrint = !!(intent & _util.RenderingIntentFlag.PRINT);
 
       for (const annotation of annotations) {
-        if (intentAny || intentDisplay && annotation.viewable || intentPrint && annotation.printable || intent & _util.RenderingIntentFlag.OPLIST) {
+        if (intentAny || intentDisplay && annotation.viewable || intentPrint && annotation.printable) {
           annotationsData.push(annotation.data);
         }
       }
@@ -23512,9 +23508,9 @@ class PartialEvaluator {
       throw new Error('getOperatorList: missing "operatorList" parameter');
     }
 
-    var boundingBoxCalculator = new _bounding_boxes.BoundingBoxesCalculator(!(intent & _util.RenderingIntentFlag.OPLIST));
-    var self = this;
-    var xref = this.xref;
+    var boundingBoxCalculator = new _bounding_boxes.BoundingBoxesCalculator(!(intent & RenderingIntentFlag.OPLIST));
+    const self = this;
+    const xref = this.xref;
     let parsingText = false;
     const localImageCache = new _image_utils.LocalImageCache();
     const localColorSpaceCache = new _image_utils.LocalColorSpaceCache();
@@ -23561,7 +23557,6 @@ class PartialEvaluator {
 
         let args = operation.args;
         let fn = operation.fn;
-        boundingBoxCalculator.incrementOperation(fn);
 
         switch (fn | 0) {
           case _util.OPS.paintXObject:
@@ -24046,7 +24041,7 @@ class PartialEvaluator {
       }
 
       closePendingRestoreOPS();
-      resolve([boundingBoxCalculator.boundingBoxes, boundingBoxCalculator.operationArray]);
+      resolve(boundingBoxCalculator.boundingBoxes);
     }).catch(reason => {
       if (reason instanceof _util.AbortException) {
         return;
@@ -53769,8 +53764,6 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
     this.boundingBoxesStack = new BoundingBoxStack();
     this.boundingBoxes = {};
     this.ignoreCalculations = ignoreCalculations;
-    this.operationArray = [];
-    this.operationIndex = -1;
   }
 
   BoundingBoxesCalculator.prototype = {
@@ -53805,14 +53798,13 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
       height[1] -= this.textStateManager.state.textMatrix[5] + shift[1];
       height = Math.sqrt(height[0] * height[0] + height[1] * height[1]);
       let [tx0, ty0] = [this.textStateManager.state.textMatrix[4] + shift[0], this.textStateManager.state.textMatrix[5] + shift[1]];
-      let glyphsSize = [];
 
       for (let i = 0; i < glyphs.length; i++) {
         let glyph = glyphs[i];
 
         if (typeof glyph === "number") {
-          if (this.textStateManager.state.font.vertical) {
-            ty = -glyph / 1000 * this.textStateManager.state.fontSize * this.textStateManager.state.textHScale;
+          if (this.textState.font.vertical) {
+            ty = -glyph / 1000 * this.textState.fontSize * this.textState.textHScale;
           } else {
             tx = -glyph / 1000 * this.textStateManager.state.fontSize * this.textStateManager.state.textHScale;
           }
@@ -53834,24 +53826,17 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
           }
         }
 
-        let [x, y] = [this.textStateManager.state.textMatrix[4] + shift[0], this.textStateManager.state.textMatrix[5] + shift[1]];
         this.textStateManager.state.translateTextMatrix(tx, ty);
-
-        if (typeof glyph !== "number") {
-          glyphsSize.push([x, y, this.textStateManager.state.textMatrix[4] + shift[0], this.textStateManager.state.textMatrix[5] + shift[1]]);
-        }
       }
 
       let [tx1, ty1] = [this.textStateManager.state.textMatrix[4] + shift[0], this.textStateManager.state.textMatrix[5] + shift[1]];
       let [tx2, ty2, tx3, ty3] = this.getTopPoints(tx0, ty0, tx1, ty1, height);
-      glyphsSize = glyphsSize.map(glyphSize => [...glyphSize, ...this.getTopPoints(...glyphSize, height)]);
 
       if (this.textStateManager.state.textMatrix[3] < 0) {
         ty0 += height * this.textStateManager.state.textMatrix[3];
         ty1 += height * this.textStateManager.state.textMatrix[3];
         ty2 += height * this.textStateManager.state.textMatrix[3];
         ty3 += height * this.textStateManager.state.textMatrix[3];
-        glyphsSize = glyphsSize.map(glyphSize => [...glyphSize.map((point, index) => index % 2 === 0 ? point : point + height * this.textStateManager.state.textMatrix[3])]);
       }
 
       let [x0, y0] = _util.Util.applyTransform([tx0, ty0], ctm);
@@ -53862,23 +53847,10 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
 
       let [x3, y3] = _util.Util.applyTransform([tx3, ty3], ctm);
 
-      glyphsSize = glyphsSize.map(glyphSize => [..._util.Util.applyTransform([glyphSize[0], glyphSize[1]], ctm), ..._util.Util.applyTransform([glyphSize[2], glyphSize[3]], ctm), ..._util.Util.applyTransform([glyphSize[4], glyphSize[5]], ctm), ..._util.Util.applyTransform([glyphSize[6], glyphSize[7]], ctm)]);
-      let minX, maxX, minY, maxY;
-      let glyphsPos = [];
-      glyphsSize.forEach(glyphSize => {
-        let xPoints = [...glyphSize].filter((point, index) => index % 2 === 0);
-        let yPoints = [...glyphSize].filter((point, index) => index % 2 !== 0);
-        minX = Math.min(...xPoints);
-        maxX = Math.max(...xPoints);
-        minY = Math.min(...yPoints);
-        maxY = Math.max(...yPoints);
-        glyphsPos.push([minX, minY, maxX - minX, maxY - minY]);
-      });
-      this.operationArray[this.operationIndex] = glyphsPos;
-      minX = Math.min(x0, x1, x2, x3);
-      maxX = Math.max(x0, x1, x2, x3);
-      minY = Math.min(y0, y1, y2, y3);
-      maxY = Math.max(y0, y1, y2, y3);
+      let minX = Math.min(x0, x1, x2, x3);
+      let maxX = Math.max(x0, x1, x2, x3);
+      let minY = Math.min(y0, y1, y2, y3);
+      let maxY = Math.max(y0, y1, y2, y3);
       this.boundingBoxesStack.save(minX, minY, maxX - minX, maxY - minY);
     },
     getClippingGraphicsBoundingBox: function BoundingBoxesCalculator_getClippingGraphicsBoundingBox() {
@@ -54278,13 +54250,6 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
     setFont: function BoundingBoxesCalculator_setFont(translated) {
       this.textStateManager.state.fontMatrix = translated.font.fontMatrix;
       this.textStateManager.state.font = translated.font;
-    },
-    incrementOperation: function BoundingBoxesCalculator_incrementOperation(fn) {
-      if (this.ignoreCalculations) {
-        return;
-      }
-
-      this.operationIndex++;
     }
   };
   return BoundingBoxesCalculator;
@@ -56058,7 +56023,7 @@ class ExtendedCatalog extends Catalog {
   }
 
   get structTreeRoot() {
-    const structTreeRoot = this._catDict.get('StructTreeRoot');
+    const structTreeRoot = this.catDict.get('StructTreeRoot');
 
     if (!(0, _primitives.isDict)(structTreeRoot)) {
       return null;
