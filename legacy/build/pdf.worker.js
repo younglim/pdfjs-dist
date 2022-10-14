@@ -64284,19 +64284,32 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
       var descent = (this.textStateManager.state.font.descent || 0) * this.textStateManager.state.fontSize;
       var ascent = (this.textStateManager.state.font.ascent || 1) * this.textStateManager.state.fontSize;
       var rise = this.textStateManager.state.textRise * this.textStateManager.state.fontSize;
+      var tx0, ty0, shift, height;
 
-      var shift = _util.Util.applyTransform([0, descent + rise], this.textStateManager.state.textMatrix);
+      if (!this.textStateManager.state.font.vertical) {
+        var _Util$applyTransform = _util.Util.applyTransform([0, descent + rise], this.textStateManager.state.textMatrix);
 
-      shift[0] -= this.textStateManager.state.textMatrix[4];
-      shift[1] -= this.textStateManager.state.textMatrix[5];
+        var _Util$applyTransform2 = _slicedToArray(_Util$applyTransform, 2);
 
-      var height = _util.Util.applyTransform([0, ascent + rise], this.textStateManager.state.textMatrix);
+        tx0 = _Util$applyTransform2[0];
+        ty0 = _Util$applyTransform2[1];
+        shift = [tx0 - this.textStateManager.state.textMatrix[4], ty0 - this.textStateManager.state.textMatrix[5]];
+        height = _util.Util.applyTransform([0, ascent - descent], this.textStateManager.state.textMatrix);
+      } else {
+        var _Util$applyTransform3 = _util.Util.applyTransform([-this.textStateManager.state.fontSize / 2, rise], this.textStateManager.state.textMatrix);
 
-      height[0] -= this.textStateManager.state.textMatrix[4] + shift[0];
-      height[1] -= this.textStateManager.state.textMatrix[5] + shift[1];
+        var _Util$applyTransform4 = _slicedToArray(_Util$applyTransform3, 2);
+
+        tx0 = _Util$applyTransform4[0];
+        ty0 = _Util$applyTransform4[1];
+        shift = [tx0 - this.textStateManager.state.textMatrix[4], ty0 - this.textStateManager.state.textMatrix[5]];
+        height = _util.Util.applyTransform([ascent - descent, 0], this.textStateManager.state.textMatrix);
+      }
+
+      height[0] -= this.textStateManager.state.textMatrix[4];
+      height[1] -= this.textStateManager.state.textMatrix[5];
       height = Math.sqrt(height[0] * height[0] + height[1] * height[1]);
-      var tx0 = this.textStateManager.state.textMatrix[4] + shift[0],
-          ty0 = this.textStateManager.state.textMatrix[5] + shift[1];
+      height *= this.textStateManager.state.textMatrix[0] * this.textStateManager.state.textMatrix[3] < 0 ? -1 : 1;
       var glyphsSize = [];
 
       for (var i = 0; i < glyphs.length; i++) {
@@ -64322,13 +64335,13 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
             tx = (w0 * this.textStateManager.state.fontSize + this.textStateManager.state.charSpacing + (glyph.isSpace ? this.textStateManager.state.wordSpacing : 0)) * this.textStateManager.state.textHScale;
           } else {
             var w1 = glyphWidth * (this.textStateManager.state.fontMatrix ? this.textStateManager.state.fontMatrix[0] : 1 / 1000);
-            ty = w1 * this.textStateManager.state.fontSize + this.textStateManager.state.charSpacing + (glyph.isSpace ? this.textStateManager.state.wordSpacing : 0);
+            ty = w1 * this.textStateManager.state.fontSize - this.textStateManager.state.charSpacing - (glyph.isSpace ? this.textStateManager.state.wordSpacing : 0);
           }
         }
 
         var x = this.textStateManager.state.textMatrix[4] + shift[0],
             y = this.textStateManager.state.textMatrix[5] + shift[1];
-        this.textStateManager.state.translateTextMatrix(tx, ty);
+        this.textStateManager.state.translateTextMatrix(tx, -ty);
 
         if (typeof glyph !== "number") {
           glyphsSize.push([x, y, this.textStateManager.state.textMatrix[4] + shift[0], this.textStateManager.state.textMatrix[5] + shift[1]]);
@@ -64349,37 +64362,25 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
         return [].concat(_toConsumableArray(glyphSize), _toConsumableArray(_this.getTopPoints.apply(_this, _toConsumableArray(glyphSize).concat([height]))));
       });
 
-      if (this.textStateManager.state.textMatrix[3] < 0) {
-        ty0 += height * this.textStateManager.state.textMatrix[3];
-        ty1 += height * this.textStateManager.state.textMatrix[3];
-        ty2 += height * this.textStateManager.state.textMatrix[3];
-        ty3 += height * this.textStateManager.state.textMatrix[3];
-        glyphsSize = glyphsSize.map(function (glyphSize) {
-          return _toConsumableArray(glyphSize.map(function (point, index) {
-            return index % 2 === 0 ? point : point + height * _this.textStateManager.state.textMatrix[3];
-          }));
-        });
-      }
-
-      var _Util$applyTransform = _util.Util.applyTransform([tx0, ty0], ctm),
-          _Util$applyTransform2 = _slicedToArray(_Util$applyTransform, 2),
-          x0 = _Util$applyTransform2[0],
-          y0 = _Util$applyTransform2[1];
-
-      var _Util$applyTransform3 = _util.Util.applyTransform([tx1, ty1], ctm),
-          _Util$applyTransform4 = _slicedToArray(_Util$applyTransform3, 2),
-          x1 = _Util$applyTransform4[0],
-          y1 = _Util$applyTransform4[1];
-
-      var _Util$applyTransform5 = _util.Util.applyTransform([tx2, ty2], ctm),
+      var _Util$applyTransform5 = _util.Util.applyTransform([tx0, ty0], ctm),
           _Util$applyTransform6 = _slicedToArray(_Util$applyTransform5, 2),
-          x2 = _Util$applyTransform6[0],
-          y2 = _Util$applyTransform6[1];
+          x0 = _Util$applyTransform6[0],
+          y0 = _Util$applyTransform6[1];
 
-      var _Util$applyTransform7 = _util.Util.applyTransform([tx3, ty3], ctm),
+      var _Util$applyTransform7 = _util.Util.applyTransform([tx1, ty1], ctm),
           _Util$applyTransform8 = _slicedToArray(_Util$applyTransform7, 2),
-          x3 = _Util$applyTransform8[0],
-          y3 = _Util$applyTransform8[1];
+          x1 = _Util$applyTransform8[0],
+          y1 = _Util$applyTransform8[1];
+
+      var _Util$applyTransform9 = _util.Util.applyTransform([tx2, ty2], ctm),
+          _Util$applyTransform10 = _slicedToArray(_Util$applyTransform9, 2),
+          x2 = _Util$applyTransform10[0],
+          y2 = _Util$applyTransform10[1];
+
+      var _Util$applyTransform11 = _util.Util.applyTransform([tx3, ty3], ctm),
+          _Util$applyTransform12 = _slicedToArray(_Util$applyTransform11, 2),
+          x3 = _Util$applyTransform12[0],
+          y3 = _Util$applyTransform12[1];
 
       glyphsSize = glyphsSize.map(function (glyphSize) {
         return [].concat(_toConsumableArray(_util.Util.applyTransform([glyphSize[0], glyphSize[1]], ctm)), _toConsumableArray(_util.Util.applyTransform([glyphSize[2], glyphSize[3]], ctm)), _toConsumableArray(_util.Util.applyTransform([glyphSize[4], glyphSize[5]], ctm)), _toConsumableArray(_util.Util.applyTransform([glyphSize[6], glyphSize[7]], ctm)));
@@ -64447,25 +64448,25 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
     getRectBoundingBox: function getRectBoundingBox(x, y, w, h) {
       var state = this.graphicsStateManager.state;
 
-      var _Util$applyTransform9 = _util.Util.applyTransform([x, y], state.ctm),
-          _Util$applyTransform10 = _slicedToArray(_Util$applyTransform9, 2),
-          x1 = _Util$applyTransform10[0],
-          y1 = _Util$applyTransform10[1];
-
-      var _Util$applyTransform11 = _util.Util.applyTransform([x + w, y], state.ctm),
-          _Util$applyTransform12 = _slicedToArray(_Util$applyTransform11, 2),
-          x2 = _Util$applyTransform12[0],
-          y2 = _Util$applyTransform12[1];
-
-      var _Util$applyTransform13 = _util.Util.applyTransform([x, y + h], state.ctm),
+      var _Util$applyTransform13 = _util.Util.applyTransform([x, y], state.ctm),
           _Util$applyTransform14 = _slicedToArray(_Util$applyTransform13, 2),
-          x3 = _Util$applyTransform14[0],
-          y3 = _Util$applyTransform14[1];
+          x1 = _Util$applyTransform14[0],
+          y1 = _Util$applyTransform14[1];
 
-      var _Util$applyTransform15 = _util.Util.applyTransform([x + w, y + h], state.ctm),
+      var _Util$applyTransform15 = _util.Util.applyTransform([x + w, y], state.ctm),
           _Util$applyTransform16 = _slicedToArray(_Util$applyTransform15, 2),
-          x4 = _Util$applyTransform16[0],
-          y4 = _Util$applyTransform16[1];
+          x2 = _Util$applyTransform16[0],
+          y2 = _Util$applyTransform16[1];
+
+      var _Util$applyTransform17 = _util.Util.applyTransform([x, y + h], state.ctm),
+          _Util$applyTransform18 = _slicedToArray(_Util$applyTransform17, 2),
+          x3 = _Util$applyTransform18[0],
+          y3 = _Util$applyTransform18[1];
+
+      var _Util$applyTransform19 = _util.Util.applyTransform([x + w, y + h], state.ctm),
+          _Util$applyTransform20 = _slicedToArray(_Util$applyTransform19, 2),
+          x4 = _Util$applyTransform20[0],
+          y4 = _Util$applyTransform20[1];
 
       x = Math.min(x1, x2, x3, x4);
       y = Math.min(y1, y2, y3, y4);
@@ -64499,12 +64500,12 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
     getLineBoundingBox: function getLineBoundingBox(x, y) {
       var state = this.graphicsStateManager.state;
 
-      var _Util$applyTransform17 = _util.Util.applyTransform([x, y], state.ctm);
+      var _Util$applyTransform21 = _util.Util.applyTransform([x, y], state.ctm);
 
-      var _Util$applyTransform18 = _slicedToArray(_Util$applyTransform17, 2);
+      var _Util$applyTransform22 = _slicedToArray(_Util$applyTransform21, 2);
 
-      x = _Util$applyTransform18[0];
-      y = _Util$applyTransform18[1];
+      x = _Util$applyTransform22[0];
+      y = _Util$applyTransform22[1];
 
       if (state.w === null) {
         state.w = Math.abs(x - state.move_x);
@@ -64569,27 +64570,27 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
       var state = this.graphicsStateManager.state;
 
       if (op !== _util.OPS.curveTo2) {
-        var _Util$applyTransform19 = _util.Util.applyTransform([x1, y1], state.ctm);
+        var _Util$applyTransform23 = _util.Util.applyTransform([x1, y1], state.ctm);
 
-        var _Util$applyTransform20 = _slicedToArray(_Util$applyTransform19, 2);
+        var _Util$applyTransform24 = _slicedToArray(_Util$applyTransform23, 2);
 
-        x1 = _Util$applyTransform20[0];
-        y1 = _Util$applyTransform20[1];
+        x1 = _Util$applyTransform24[0];
+        y1 = _Util$applyTransform24[1];
       }
 
-      var _Util$applyTransform21 = _util.Util.applyTransform([x2, y2], state.ctm);
+      var _Util$applyTransform25 = _util.Util.applyTransform([x2, y2], state.ctm);
 
-      var _Util$applyTransform22 = _slicedToArray(_Util$applyTransform21, 2);
+      var _Util$applyTransform26 = _slicedToArray(_Util$applyTransform25, 2);
 
-      x2 = _Util$applyTransform22[0];
-      y2 = _Util$applyTransform22[1];
+      x2 = _Util$applyTransform26[0];
+      y2 = _Util$applyTransform26[1];
 
-      var _Util$applyTransform23 = _util.Util.applyTransform([x3, y3], state.ctm);
+      var _Util$applyTransform27 = _util.Util.applyTransform([x3, y3], state.ctm);
 
-      var _Util$applyTransform24 = _slicedToArray(_Util$applyTransform23, 2);
+      var _Util$applyTransform28 = _slicedToArray(_Util$applyTransform27, 2);
 
-      x3 = _Util$applyTransform24[0];
-      y3 = _Util$applyTransform24[1];
+      x3 = _Util$applyTransform28[0];
+      y3 = _Util$applyTransform28[1];
       var curveX = this.getCurve(x0, x1, x2, x3);
       var curveY = this.getCurve(y0, y1, y2, y3);
 
@@ -64667,25 +64668,25 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
     getImageBoundingBox: function getImageBoundingBox() {
       var state = this.graphicsStateManager.state;
 
-      var _Util$applyTransform25 = _util.Util.applyTransform([0, 0], state.ctm),
-          _Util$applyTransform26 = _slicedToArray(_Util$applyTransform25, 2),
-          x0 = _Util$applyTransform26[0],
-          y0 = _Util$applyTransform26[1];
-
-      var _Util$applyTransform27 = _util.Util.applyTransform([0, 1], state.ctm),
-          _Util$applyTransform28 = _slicedToArray(_Util$applyTransform27, 2),
-          x1 = _Util$applyTransform28[0],
-          y1 = _Util$applyTransform28[1];
-
-      var _Util$applyTransform29 = _util.Util.applyTransform([1, 1], state.ctm),
+      var _Util$applyTransform29 = _util.Util.applyTransform([0, 0], state.ctm),
           _Util$applyTransform30 = _slicedToArray(_Util$applyTransform29, 2),
-          x2 = _Util$applyTransform30[0],
-          y2 = _Util$applyTransform30[1];
+          x0 = _Util$applyTransform30[0],
+          y0 = _Util$applyTransform30[1];
 
-      var _Util$applyTransform31 = _util.Util.applyTransform([1, 0], state.ctm),
+      var _Util$applyTransform31 = _util.Util.applyTransform([0, 1], state.ctm),
           _Util$applyTransform32 = _slicedToArray(_Util$applyTransform31, 2),
-          x3 = _Util$applyTransform32[0],
-          y3 = _Util$applyTransform32[1];
+          x1 = _Util$applyTransform32[0],
+          y1 = _Util$applyTransform32[1];
+
+      var _Util$applyTransform33 = _util.Util.applyTransform([1, 1], state.ctm),
+          _Util$applyTransform34 = _slicedToArray(_Util$applyTransform33, 2),
+          x2 = _Util$applyTransform34[0],
+          y2 = _Util$applyTransform34[1];
+
+      var _Util$applyTransform35 = _util.Util.applyTransform([1, 0], state.ctm),
+          _Util$applyTransform36 = _slicedToArray(_Util$applyTransform35, 2),
+          x3 = _Util$applyTransform36[0],
+          y3 = _Util$applyTransform36[1];
 
       state.x = Math.min(x0, x1, x2, x3);
       state.y = Math.min(y0, y1, y2, y3);
@@ -64792,12 +64793,12 @@ var BoundingBoxesCalculator = function PartialEvaluatorClosure() {
         case _util.OPS.moveTo:
           var ctm = this.graphicsStateManager.state.ctm.slice();
 
-          var _Util$applyTransform33 = _util.Util.applyTransform(args, ctm);
+          var _Util$applyTransform37 = _util.Util.applyTransform(args, ctm);
 
-          var _Util$applyTransform34 = _slicedToArray(_Util$applyTransform33, 2);
+          var _Util$applyTransform38 = _slicedToArray(_Util$applyTransform37, 2);
 
-          this.graphicsStateManager.state.move_x = _Util$applyTransform34[0];
-          this.graphicsStateManager.state.move_y = _Util$applyTransform34[1];
+          this.graphicsStateManager.state.move_x = _Util$applyTransform38[0];
+          this.graphicsStateManager.state.move_y = _Util$applyTransform38[1];
           break;
 
         case _util.OPS.lineTo:
