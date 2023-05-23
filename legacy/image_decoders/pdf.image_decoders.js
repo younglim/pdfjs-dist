@@ -9788,7 +9788,7 @@ var _jpg = __w_pdfjs_require__(10);
 
 var _jpx = __w_pdfjs_require__(11);
 
-var pdfjsVersion = '2.14.305';
+var pdfjsVersion = '2.16.105';
 var pdfjsBuild = 'eaaa8b4';
 })();
 

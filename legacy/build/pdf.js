@@ -5879,7 +5879,7 @@ function _fetchDocument2() {
             _context7.next = 5;
             return worker.messageHandler.sendWithPromise("GetDocRequest", {
               docId: docId,
-              apiVersion: '2.14.305',
+              apiVersion: '2.16.105',
               source: {
                 data: source.data,
                 url: source.url,
@@ -8734,7 +8734,7 @@ var _canvasInUse = {
   writable: true,
   value: new WeakSet()
 };
-var version = '2.14.305';
+var version = '2.16.105';
 exports.version = version;
 var build = 'eaaa8b4';
 exports.build = build;
@@ -24783,7 +24783,7 @@ var _svg = __w_pdfjs_require__(180);
 
 var _xfa_layer = __w_pdfjs_require__(178);
 
-var pdfjsVersion = '2.14.305';
+var pdfjsVersion = '2.16.105';
 var pdfjsBuild = 'eaaa8b4';
 {
   if (_is_node.isNodeJS) {
