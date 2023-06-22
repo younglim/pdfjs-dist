@@ -65020,6 +65020,10 @@ var BoundingBoxStack = function BoundingBoxStack() {
     end: function BoundingBoxStack_end() {
       var last = this.stack.pop();
 
+      if (!last) {
+        return null;
+      }
+
       if (last.mcid !== null) {
         return last;
       } else {
