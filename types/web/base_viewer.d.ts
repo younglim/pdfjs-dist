@@ -223,7 +223,7 @@ export class BaseViewer implements IPDFAnnotationLayerFactory, IPDFAnnotationEdi
     setDocument(pdfDocument: PDFDocumentProxy): void;
     pdfDocument: import("../src/display/api").PDFDocumentProxy | undefined;
     _scrollMode: any;
-    _optionalContentConfigPromise: Promise<any> | Promise<import("../src/display/optional_content_config.js").OptionalContentConfig> | null | undefined;
+    _optionalContentConfigPromise: Promise<import("../src/display/optional_content_config.js").OptionalContentConfig> | Promise<OptionalContentConfig> | null | undefined;
     /**
      * @param {Array|null} labels
      */
